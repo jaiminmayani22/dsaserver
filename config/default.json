@@ -1,0 +1,17 @@
+{
+    "NO_DEBUG_DATA":"NO DEBUG DATA PROVIDED",
+    "STATUS" : {
+        "INFO" : "info",
+        "DEBUG" : "debug",
+        "WARN" : "warn",
+        "ERROR" : "error"
+    },
+    "DB_SUCCESS_CONNECT" : "Successfully connected to database",
+    "DB_FAILED_CONNECT" : "Could not connect to the database. Exiting now...",
+    "SUPERSECRET" : "airwe",
+    "ALGO" :"aes-256-cbc",
+	"ENCRYPTION_KEY" : "rbzYbCrwd4M2fFutsdCtexHANdBTK9hs",
+    "IV_LENGTH": 16,
+    "UNDEFINED": "undefined",
+    "INVALID_EMAIL": "Invalid email address"
+}

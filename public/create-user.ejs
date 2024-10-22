@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en-US">
+<head>
+    <meta content="text/html; charset=utf-8" http-equiv="Content-Type" />
+    <title>New Account Email Template</title>
+    <meta name="description" content="New Account Email Template.">
+     <style>
+    .svg-container {
+    display: inline-block;
+    border-radius: 50%;
+    padding: 7px 12px;
+    }
+    
+    .svg-container:hover  {  
+      border-radius: 50%;
+      background:rgb(255, 225, 53);
+    }
+      .svg-container:hover .svg-main path{
+        fill:yellow;
+        background-color:yellow
+      }
+     
+        @media (max-width: 600px) {
+            .otpBody{
+                width: 50% !important;
+                font-size: 30px !important;
+                padding-left: 2%!important;
+            }
+            .air{
+                font-size: 25px !important;
+            }
+            .logo{
+                width: 40%!important;
+            }
+        }
+  
+  </style> 
+</head>
+
+<body marginheight="0" topmargin="0" marginwidth="0" style="margin: 0px">
+    <table cellspacing="0";border="0" cellpadding="0" width="100%">
+        <tr>
+            <td>
+                <table style=" max-width:670px; margin:0 auto;text-align: center;" width="100%";border="0";align="center" cellpadding="0"
+                    cellspacing="0">
+                
+                   <header>
+                    %{header}
+                   </header>
+
+                    <tr>
+                        <td>
+                            <table width="95%" ;border="0";align="center" cellpadding="0" cellspacing="0"
+                                style="text-align:center">
+                                <tr>
+                                    <td style="height:20px;">&nbsp;</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding:0 35px;">
+                                        <h1
+                                            style="color:#1e1e2d; font-weight:500; margin:0;font-size:32px;font-family:'Rubik',sans-serif;">
+                                            Welcome to AirWe !
+                                        </h1>
+                                        <h1
+                                            style="color:#1e1e2d; font-weight:500;font-weight:bolder; margin:0;font-size:22px;font-family:'Rubik',sans-serif;text-transform: capitalize;">
+                                            Dear <%= username %>  ,
+                                        </h1>
+                                        <p style="font-size:15px; color:#455056; margin:8px 0 0; line-height:24px;">
+                                            Thank you for registering on Airwe. To complete your registration, please
+                                            use the following One-Time Password</p>
+                                         <p style="font-size:18px; color:#455056; margin:8px 0 0; line-height:24px;font-weight: 600;">%{email}</p>
+                                         <p style="font-size:18px; color:#455056; margin:8px 0 0; line-height:24px;font-weight: 600;">%{password}</p>
+                                         <p style="font-size:18px; color:#455056; margin:8px 0 0; line-height:24px;font-weight: 600;">%{role}</p>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="height:20px;">&nbsp;</td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <p style="font-size:15px; color:#455056; margin:8px 0 0; line-height:24px;">
+                                            Please enter the OTP in the registration form to verify your account.</p>
+                                    </td>
+                                <tr>
+                                    <td>
+                                        <p style="font-size:15px; color:#455056; margin:8px 0 0; line-height:24px;">
+                                            If you did not register on Airwe, please ignore this email.</p>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <p
+                                            style="font-size:15px; color:#455056;font-weight:bolder; margin:8px 0 0; line-height:24px;">
+                                            Thank you,The Airwe Team</p>
+                                    </td>
+                                </tr>
+                    </tr>
+
+                </table>
+            </td>
+        </tr>
+        <tr>
+            <td style="height:20px;">&nbsp;</td>
+        </tr>
+       <footer>
+        %{footer}
+       </footer>
+       
+    </table>
+    </td>
+    </tr>
+    </table>
+
+</body>
+
+</html>
