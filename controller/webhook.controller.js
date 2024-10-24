@@ -78,8 +78,6 @@ async function processWhatsappMessages(data) {
             });
 
             await newReceivedMessage.save();
-
-            // Send response message
             const responseMessage = "Hello! Thank you for reaching out. Call us at 9727427410 for more information!";
             await sendWhatsappTextMessage(msg.from, responseMessage);
         }

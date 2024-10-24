@@ -21,17 +21,14 @@ var eventsCronjob = require('../common/eventCron.js');
 
 app.set("trust proxy", 1);
 let corsOptions = {
-  origin: [ 
-    "http://localhost:3000",
-    "http://localhost:3000/",
-    "http://192.168.137.1:3000/",
-    "http://192.168.43.27:3000/",
-    "https://lavenderblush-turkey-116295.hostingersite.com/",
-    "https://lavenderblush-turkey-116295.hostingersite.com"
-   ],
+  // origin: [ 
+  //   "http://localhost:3000",
+  //   "http://192.168.137.1:3000",
+  //   "https://lavenderblush-turkey-116295.hostingersite.com"
+  // ]
+  origin: "*",
 };
 
-// connecting to database
 mongoose.promise = global.Promise;
 connectDB();
 app.set("views", path.join(__dirname, "../views"));

@@ -78,6 +78,7 @@ module.exports = Object.freeze({
   ALLOW_IMAGE_TYPE: ["image/jpeg", "image/png", "image/jpg", "image/heic","image/svg+xml", "video/mpeg", "video/mp4", "video/mpeg2", "video/mpeg3"],
   MESSAGE: {
     TEMPLATE_NOT_FOUND: "Template not found",
+    CAMPAIGN_NOT_FOUND: "Campaign not found",
     IMAGE_NOT_UPLOADED: "Image not uploaded",
     IMAGE_UPLOADED: "Image uploaded",
     TEMPLATE_FORMAT_UPLOADED: "Template Format uploaded",

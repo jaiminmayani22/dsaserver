@@ -7,6 +7,7 @@ router.post("/createCampaignMarketing", auth, campaignCtrl.createCampaignMarketi
 router.post("/createCampaignUtility", auth, campaignCtrl.createCampaignUtility);
 router.post("/sendMessage", auth, campaignCtrl.sendMessage);
 router.post("/getAllCampaigns", auth, campaignCtrl.getAllCampaigns);
+router.delete("/deleteCampaign", auth, campaignCtrl.deleteCampaign);
 router.post("/campaignAudienceCount", auth, campaignCtrl.campaignAudienceCount);
 
 module.exports = router;

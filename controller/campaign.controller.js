@@ -306,6 +306,28 @@ exports.getAllCampaigns = async (req, res) => {
   }
 };
 
+exports.deleteCampaign = async (req, res) => {
+  try {
+    const { id } = req.body;
+    const campaign = await CAMPAIGN_MODULE.findByIdAndUpdate(
+      id,
+      { isDeleted: true },
+      { new: true }
+    );
+    if (!campaign) {
+      return res.status(404).send({ message: CONSTANT.MESSAGE.CAMPAIGN_NOT_FOUND });
+    }
+    return res.status(200).json({
+      message: CONSTANT.COLLECTION.TEMPLATE + CONSTANT.MESSAGE.DELETED_SUCCESSFULLY,
+      data: campaign,
+    });
+  } catch (err) {
+    return res.status(404).send({
+      message: err.message || CONSTANT.MESSAGE.ERROR_OCCURRED,
+    });
+  }
+};
+
 /*
 Method: Post
 Todo: Message Schedule Marketting 
@@ -660,9 +682,9 @@ const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, 
         ],
       },
     };
-    console.log("message Data : ", messageData);
 
     try {
+      console.log("WHATSAPP_API_TOKEN: ", process.env.WHATSAPP_API_TOKEN);
       await fetch(process.env.WHATSAPP_API_URL, {
         method: 'POST',
         headers: {
@@ -672,10 +694,12 @@ const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, 
         body: JSON.stringify(messageData)
       })
         .then(async (response) => {
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-          const data = await response.json();
+          // if (!response.ok) {
+          //   throw new Error(`HTTP error! status: ${response.status}`);
+          // }
+          const responseBody = await response.json();
+          console.log("Response body:", responseBody);
+
           // return data;
         }).catch((error) => {
           return error.message
@@ -683,6 +707,7 @@ const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, 
     } catch (error) {
       console.error(`Failed to send message to ${mobileNumber}:`, error);
     }
+
     fs.unlink(absoluteTempImagePath, (err) => {
       if (err) {
         console.error(`Error deleting file: ${absoluteTempImagePath}`, err);
@@ -721,9 +746,10 @@ const editUtilityImage = async ({
     let mainImage;
     try {
       const response = await fetch(imagePath);
-      if (!response.ok) throw new Error('Failed to load main image');
-      const buffer = await response.buffer();
-      mainImage = await loadImage(buffer);
+      if (response.ok) {
+        const buffer = await response.buffer();
+        mainImage = await loadImage(buffer);
+      }
     } catch (err) {
       throw new Error('Failed to load main image: ' + err.message);
     }
@@ -749,37 +775,38 @@ const editUtilityImage = async ({
       if (type === 'text') {
         let updatedContent = content;
         if (/Name/i.test(content)) {
-          updatedContent = updatedContent.replace(/NAME/i, username ? username : '');
+          updatedContent = updatedContent.replace(/Name/i, username ? username : '');
         }
         if (/Number/i.test(content)) {
-          updatedContent = updatedContent.replace(/NUMBER/i, number ? number : '');
+          updatedContent = updatedContent.replace(/Number/i, number ? number : '');
         }
         if (/instagramId/i.test(content)) {
-          updatedContent = updatedContent.replace(/INSTAGRAMID/i, instagramID ? instagramID : '');
+          updatedContent = updatedContent.replace(/instagramId/i, instagramID ? instagramID : '');
         }
         if (/facebookId/i.test(content)) {
-          updatedContent = updatedContent.replace(/FACEBOOKID/i, facebookID ? facebookID : '');
+          updatedContent = updatedContent.replace(/facebookId/i, facebookID ? facebookID : '');
         }
         if (/companyName/i.test(content)) {
-          updatedContent = updatedContent.replace(/COMPANYNAME/i, company_name ? company_name : '');
+          updatedContent = updatedContent.replace(/companyName/i, company_name ? company_name : '');
         }
         if (/email/i.test(content)) {
-          updatedContent = updatedContent.replace(/EMAIL/i, email ? email : '');
+          updatedContent = updatedContent.replace(/email/i, email ? email : '');
         }
         if (/Website/i.test(content)) {
-          updatedContent = updatedContent.replace(/WEBSITE/i, userWebsite);
+          updatedContent = updatedContent.replace(/Website/i, userWebsite ? userWebsite : '');
         }
 
         if (/Logo/i.test(content)) {
           if (logoImage) {
             const logoResponse = await fetch(logoImage);
-            if (!logoResponse.ok) throw new Error('Failed to fetch logo image');
-            const logoBuffer = await logoResponse.buffer();
-            const logoImageLoaded = await loadImage(logoBuffer);
-            const logoWidth = parseFloat(fontSize);
-            const logoHeight = parseFloat(fontSize);
-            ctx.drawImage(logoImageLoaded, x, y, logoWidth, logoHeight);
-            continue;
+            if (logoResponse.ok) {
+              const logoBuffer = await logoResponse.buffer();
+              const logoImageLoaded = await loadImage(logoBuffer);
+              const logoWidth = parseFloat(fontSize);
+              const logoHeight = parseFloat(fontSize);
+              ctx.drawImage(logoImageLoaded, x, y, logoWidth, logoHeight);
+              continue;
+            };
           } else {
             updatedContent = updatedContent.replace(/LOGO/i, '');
           }
@@ -805,8 +832,7 @@ const editUtilityImage = async ({
       }
     }
 
-
-    const tempImagePath = path.join(CONSTANT.UPLOAD_DOC_PATH.SCHEDULE_UTILITY, `${Date.now()}_edited_image.png`);
+    const tempImagePath = path.join(CONSTANT.UPLOAD_DOC_PATH.SCHEDULE_UTILITY, `edited_image.png`);
     const buffer = canvas.toBuffer('image/png');
     if (buffer.length === 0) {
       throw new Error('The buffer is empty, cannot write to file.');
