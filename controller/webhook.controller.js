@@ -1,4 +1,3 @@
-const MESSAGE_SCHEDULE = require("../module/messageSchedule.module");
 const MESSAGE_LOG = require("../module/messageLog.module");
 const RECEIVED_MESSAGE = require("../module/receivedMessage.module");
 const CLIENT_MODULE = require("../module/client.module");

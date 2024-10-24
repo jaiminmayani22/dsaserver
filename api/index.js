@@ -25,7 +25,9 @@ let corsOptions = {
     "http://localhost:3000",
     "http://localhost:3000/",
     "http://192.168.137.1:3000/",
-    "http://192.168.43.27:3000/"
+    "http://192.168.43.27:3000/",
+    "https://lavenderblush-turkey-116295.hostingersite.com/",
+    "https://lavenderblush-turkey-116295.hostingersite.com"
    ],
 };
 

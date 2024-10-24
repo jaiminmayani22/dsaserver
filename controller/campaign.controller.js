@@ -562,51 +562,51 @@ exports.sendMessage = sendInstantMessage;
 
 //SEND MARKETING MESSAGE
 const sendMarketingWhatsAppMessages = async (mobileNumbers, images, _id, caption) => {
-  // for (const mobileNumber of mobileNumbers) {
-  //   const messageData = {
-  //     messaging_product: "whatsapp",
-  //     to: `+91${mobileNumber}`,
-  //     type: "template",
-  //     template: {
-  //       name: CONSTANT.TEMPLATE_NAME.FOR_IMAGE,
-  //       language: { code: "en" },
-  //       components: [
-  //         {
-  //           type: "header",
-  //           parameters: [{ type: "image", image: { link: images } }],
-  //         },
-  //         {
-  //           type: "body",
-  //           parameters: [{ type: "text", text: caption }],
-  //         },
-  //       ],
-  //     },
-  //   };
-  //   console.log("messageData : " + JSON.stringify(messageData));
+  for (const mobileNumber of mobileNumbers) {
+    const messageData = {
+      messaging_product: "whatsapp",
+      to: `+91${mobileNumber}`,
+      type: "template",
+      template: {
+        name: CONSTANT.TEMPLATE_NAME.FOR_IMAGE,
+        language: { code: "en" },
+        components: [
+          {
+            type: "header",
+            parameters: [{ type: "image", image: { link: images } }],
+          },
+          {
+            type: "body",
+            parameters: [{ type: "text", text: caption }],
+          },
+        ],
+      },
+    };
+    console.log("messageData : " + JSON.stringify(messageData));
 
-  //   try {
-  //     await fetch(process.env.WHATSAPP_API_URL, {
-  //       method: 'POST',
-  //       headers: {
-  //         'Authorization': `Bearer ${process.env.WHATSAPP_API_TOKEN}`,
-  //         'Content-Type': 'application/json',
-  //       },
-  //       body: JSON.stringify(messageData)
-  //     })
-  //       .then(async (response) => {
-  //         if (!response.ok) {
-  //           throw new Error(`HTTP error! status: ${response.status}`);
-  //         }
+    try {
+      await fetch(process.env.WHATSAPP_API_URL, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.WHATSAPP_API_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(messageData)
+      })
+        .then(async (response) => {
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
 
-  //         const data = await response.json();
-  //         return data;
-  //       }).catch((error) => {
-  //         return error.message
-  //       });
-  //   } catch (error) {
-  //     console.error(`Failed to send message to ${mobileNumber}:`, error);
-  //   }
-  // }
+          const data = await response.json();
+          // return data;
+        }).catch((error) => {
+          return error.message
+        });
+    } catch (error) {
+      console.error(`Failed to send message to ${mobileNumber}:`, error);
+    }
+  }
   await updateMessageStatus(_id, 'completed');
 };
 
@@ -641,54 +641,55 @@ const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, 
     const absoluteTempImagePath = path.resolve(tempImagePath);
     const imageUrl = `http://localhost:8080/./public/schedule_utility/${path.basename(absoluteTempImagePath)}`;
 
-    // const messageData = {
-    //   messaging_product: "whatsapp",
-    //   to: `+91${mobileNumber}`,
-    //   type: "template",
-    //   template: {
-    //     name: CONSTANT.TEMPLATE_NAME.FOR_IMAGE,
-    //     language: { code: "en" },
-    //     components: [
-    //       {
-    //         type: "header",
-    //         parameters: [{ type: "image", image: { link: imageUrl } }],
-    //       },
-    //       {
-    //         type: "body",
-    //         parameters: [{ type: "text", text: caption }],
-    //       },
-    //     ],
-    //   },
-    // };
+    const messageData = {
+      messaging_product: "whatsapp",
+      to: `+91${mobileNumber}`,
+      type: "template",
+      template: {
+        name: CONSTANT.TEMPLATE_NAME.FOR_IMAGE,
+        language: { code: "en" },
+        components: [
+          {
+            type: "header",
+            parameters: [{ type: "image", image: { link: imageUrl } }],
+          },
+          {
+            type: "body",
+            parameters: [{ type: "text", text: caption }],
+          },
+        ],
+      },
+    };
+    console.log("message Data : ", messageData);
 
-    // try {
-    //   await fetch(process.env.WHATSAPP_API_URL, {
-    //     method: 'POST',
-    //     headers: {
-    //       'Authorization': `Bearer ${process.env.WHATSAPP_API_TOKEN}`,
-    //       'Content-Type': 'application/json',
-    //     },
-    //     body: JSON.stringify(messageData)
-    //   })
-    //     .then(async (response) => {
-    //       if (!response.ok) {
-    //         throw new Error(`HTTP error! status: ${response.status}`);
-    //       }
-    //       const data = await response.json();
-    //       return data;
-    //     }).catch((error) => {
-    //       return error.message
-    //     });
-    // } catch (error) {
-    //   console.error(`Failed to send message to ${mobileNumber}:`, error);
-    // }
-    // fs.unlink(absoluteTempImagePath, (err) => {
-    //   if (err) {
-    //     console.error(`Error deleting file: ${absoluteTempImagePath}`, err);
-    //   } else {
-    //     console.log(`Successfully deleted file: ${absoluteTempImagePath}`);
-    //   }
-    // });
+    try {
+      await fetch(process.env.WHATSAPP_API_URL, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.WHATSAPP_API_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(messageData)
+      })
+        .then(async (response) => {
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          const data = await response.json();
+          // return data;
+        }).catch((error) => {
+          return error.message
+        });
+    } catch (error) {
+      console.error(`Failed to send message to ${mobileNumber}:`, error);
+    }
+    fs.unlink(absoluteTempImagePath, (err) => {
+      if (err) {
+        console.error(`Error deleting file: ${absoluteTempImagePath}`, err);
+      } else {
+        console.log(`Successfully deleted file: ${absoluteTempImagePath}`);
+      }
+    });
   }
   await updateMessageStatus(_id, 'completed');
 };
@@ -747,9 +748,6 @@ const editUtilityImage = async ({
 
       if (type === 'text') {
         let updatedContent = content;
-
-        console.log("content : ", content);
-
         if (/Name/i.test(content)) {
           updatedContent = updatedContent.replace(/NAME/i, username ? username : '');
         }
@@ -771,7 +769,6 @@ const editUtilityImage = async ({
         if (/Website/i.test(content)) {
           updatedContent = updatedContent.replace(/WEBSITE/i, userWebsite);
         }
-        console.log("parseFloat(fontSize) : ", parseFloat(fontSize));
 
         if (/Logo/i.test(content)) {
           if (logoImage) {
