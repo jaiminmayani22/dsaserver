@@ -48,13 +48,9 @@ exports.webhookGet = async (req, res) => {
     let challenge = req.query["hub.challenge"];
     let token = req.query["hub.verify_token"];
 
-    const myToken = "";
-    console.log("Data : ", mode, token, challenge);
-
+    const myToken = "dsaadmin00";
     if (mode && token) {
-        console.log("Get Webhook");
         if (mode === "subscribe" && token === myToken) {
-            console.log("Get Webhook1");
             res.status(200).send(challenge);
         } else {
             console.log("Get Webhook22222");
