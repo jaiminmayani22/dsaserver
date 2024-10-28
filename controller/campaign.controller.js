@@ -634,7 +634,6 @@ const sendMarketingWhatsAppMessages = async (mobileNumbers, images, _id, caption
 
 //SEND UTILITY MESSAGE
 const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, selectedRefTemplate) => {
-  let cnt = 0;
   const refTemplate = await REF_TEMPLATE_MODULE.findById(selectedRefTemplate);
   if (!refTemplate) {
     throw new Error('Template not found');
@@ -665,7 +664,8 @@ const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, 
 
     const messageData = {
       messaging_product: "whatsapp",
-      to: `+91${mobileNumber}`,
+      recepient_type: "individual",
+      to: `${mobileNumber}`,
       type: "template",
       template: {
         name: CONSTANT.TEMPLATE_NAME.FOR_IMAGE,
@@ -684,7 +684,8 @@ const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, 
     };
 
     try {
-      console.log("WHATSAPP_API_TOKEN: ", process.env.WHATSAPP_API_TOKEN);
+      console.log("messageData : ", messageData);
+
       await fetch(process.env.WHATSAPP_API_URL, {
         method: 'POST',
         headers: {

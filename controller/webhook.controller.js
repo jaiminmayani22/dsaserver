@@ -10,32 +10,24 @@ Method: POST
 Todo: Webhook 
 */
 exports.webhookPost = async (req, res) => {
-    const errors = validationResult(req).array();
-    if (errors && errors.length > 0) {
-        let messArr = errors.map((a) => a.msg);
-        return res.status(400).send({
-            message: CONSTANT.MESSAGE.REQUIRED_FIELDS_MISSING,
-            error: messArr.join(", "),
+    try {
+        const body_params = req.body;
+        console.log(JSON.stringify(body_params), null, 2);
+
+        // Handle incoming messages
+        await processWhatsappMessages(data);
+        console.log("Process Whatsapp Message Done", JSON.stringify(data));
+
+        // Update WhatsApp statuses
+        console.log("JSON.stringify(data) : ", JSON.stringify(data));
+
+        await updateWhatsappStatuses(JSON.stringify(data));
+
+        res.status(200).send({ message: CONSTANT.MESSAGE.WEBHOOK_SUCCESS });
+    } catch (err) {
+        return res.status(500).send({
+            message: err.message || CONSTANT.MESSAGE.ERROR_OCCURRED,
         });
-    } else {
-        try {
-            const data = req.body;
-
-            // Handle incoming messages
-            await processWhatsappMessages(data);
-            console.log("Process Whatsapp Message Done", JSON.stringify(data));
-
-            // Update WhatsApp statuses
-            console.log("JSON.stringify(data) : ",JSON.stringify(data));
-            
-            await updateWhatsappStatuses(JSON.stringify(data));
-
-            res.status(200).send({ message: CONSTANT.MESSAGE.WEBHOOK_SUCCESS });
-        } catch (err) {
-            return res.status(500).send({
-                message: err.message || CONSTANT.MESSAGE.ERROR_OCCURRED,
-            });
-        }
     }
 };
 
@@ -48,7 +40,7 @@ exports.webhookGet = async (req, res) => {
     let challenge = req.query["hub.challenge"];
     let token = req.query["hub.verify_token"];
 
-    const myToken = "";
+    const myToken = "dsaadmin001";
     console.log("Data : ", mode, token, challenge);
 
     if (mode && token) {
@@ -117,7 +109,6 @@ async function sendWhatsappTextMessage(to, message) {
 }
 
 // Functions for Processing Whatsapp Messages 
-
 async function updateWhatsappStatuses(data) {
     try {
         const parsedData = JSON.parse(data);
