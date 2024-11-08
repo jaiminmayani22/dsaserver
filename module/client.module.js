@@ -7,6 +7,7 @@ const ClientSchema = mongoose.Schema(
     company_name: { type: String, default: CONSTANT.NULL_STRING },
     mobile_number: { type: String, default: CONSTANT.NULL_STRING },
     whatsapp_number: { type: String, default: CONSTANT.NULL_STRING },
+    website: { type: String, default: CONSTANT.NULL_STRING },
     isNumberOnWhatsapp: { type: String, default: "yes" },
     invalidWhatsappNumber: { type: Boolean, default: false },
     invalidPhoneNumber: { type: Boolean, default: false },

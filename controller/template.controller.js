@@ -178,7 +178,7 @@ exports.templateReferenceFormatUpload = async (req, res, next) => {
 
           if (typeof obj.layers === 'string') {
             try {
-              obj.layers = JSON.parse(obj.layers); 
+              obj.layers = JSON.parse(obj.layers);
             } catch (error) {
               return res.status(400).send({
                 message: 'Invalid layers format.',
@@ -195,7 +195,7 @@ exports.templateReferenceFormatUpload = async (req, res, next) => {
 
           try {
             const templateReferenceFormat = await TEMPLATE_REFERENCE_FORMAT_MODULE.create(obj);
-            return res.status(201).send({data: templateReferenceFormat, message: CONSTANT.MESSAGE.TEMPLATE_FORMAT_UPLOADED}); // Send the created object back
+            return res.status(201).send({ data: templateReferenceFormat, message: CONSTANT.MESSAGE.TEMPLATE_FORMAT_UPLOADED }); // Send the created object back
           } catch (createError) {
             return res.status(500).send({
               message: createError.message || 'Error saving template reference format.',
@@ -274,7 +274,7 @@ exports.getAllReferenceTemplateFormat = async (req, res) => {
     });
   } else {
     try {
-await TEMPLATE_REFERENCE_FORMAT_MODULE.find({ isDeleted: false }).then((response) => {
+      await TEMPLATE_REFERENCE_FORMAT_MODULE.find({ isDeleted: false }).then((response) => {
         return res.status(200).send(response)
       })
         .catch((err) => {
@@ -518,16 +518,15 @@ TODO: POST
 Topic: Create Variable
 */
 exports.createVariable = async (req, res) => {
-    try {
-      const extGrp = await VARIABLE_MODULE.findOne({ name: req.body.name });
-      if (extGrp) {
-        return res.status(400).send({ message: CONSTANT.MESSAGE.VARIABLE_ALREADY_EXIST });
-      }
-
+  try {
+    const variable = req.body.key;
+    const extGrp = await VARIABLE_MODULE.findOne({ name: variable, isDeleted: false });
+    if (extGrp) {
+      return res.status(400).send({ message: CONSTANT.MESSAGE.VARIABLE_ALREADY_EXIST });
+    } else {
       let groupObj = {
         name: req.body.key,
       };
-
       VARIABLE_MODULE.create(groupObj)
         .then((result) => {
           return res.status(200).send({ data: result, message: CONSTANT.MESSAGE.REGISTER_SUCCESSFULLY_R })
@@ -537,11 +536,12 @@ exports.createVariable = async (req, res) => {
             message: err.message || CONSTANT.MESSAGE.ERROR_OCCURRED,
           });
         });
-    } catch (err) {
-      return res.status(500).send({
-        message: err.message || CONSTANT.MESSAGE.ERROR_OCCURRED,
-      });
     }
+  } catch (err) {
+    return res.status(500).send({
+      message: err.message || CONSTANT.MESSAGE.ERROR_OCCURRED,
+    });
+  }
 };
 
 /*
@@ -549,20 +549,20 @@ TODO: POST
 Topic: Get all Variables
 */
 exports.getAllVariables = async (req, res) => {
-    try {
-      await VARIABLE_MODULE.find({ isDeleted: false }).then((response) => {
-        return res.status(200).send(response)
-      })
-        .catch((err) => {
-          return res.status(404).send({
-            message: err.message || CONSTANT.MESSAGE.ERROR_OCCURRED,
-          });
+  try {
+    await VARIABLE_MODULE.find({ isDeleted: false }).then((response) => {
+      return res.status(200).send(response)
+    })
+      .catch((err) => {
+        return res.status(404).send({
+          message: err.message || CONSTANT.MESSAGE.ERROR_OCCURRED,
         });
-    } catch (err) {
-      return res.status(500).send({
-        message: err.message || CONSTANT.MESSAGE.ERROR_OCCURRED,
       });
-    }
+  } catch (err) {
+    return res.status(500).send({
+      message: err.message || CONSTANT.MESSAGE.ERROR_OCCURRED,
+    });
+  }
 };
 
 /*

@@ -10,6 +10,8 @@ const path = require("path");
 const fs = require("fs");
 const { createCanvas, Image, loadImage } = require('canvas');
 const fetch = require('node-fetch');
+const dotenv = require("dotenv");
+dotenv.config();
 
 /*
 Method: Post
@@ -245,6 +247,80 @@ exports.createCampaignUtility = async (req, res, folder) => {
   }
 };
 
+/*
+Method: Post
+Todo: Retarget Campaign
+*/
+exports.createRetargetCampaign = async (req, res) => {
+  const errors = validationResult(req).array();
+  if (errors && errors.length > 0) {
+    let messArr = errors.map((a) => a.msg);
+    return res.status(400).send({
+      message: CONSTANT.MESSAGE.REQUIRED_FIELDS_MISSING,
+      error: messArr.join(", "),
+    });
+  } else {
+    try {
+      const { userId, _ } = commonService.getUserIdFromToken(req);
+      let obj = req.body;
+      let data = {
+        name: obj.name,
+        type: obj.type,
+        audience: obj.audience,
+        messageType: obj.messageType,
+        caption: obj.caption,
+        button: obj.button,
+        addedBy: obj.addedBy,
+        document: obj.document,
+        addedBy: obj.addedBy,
+        documentType: obj.documentType,
+        selectedRefTemplate: obj.selectedRefTemplate,
+        addedBy: userId,
+        groups: obj.groups,
+        audienceIds: obj.audienceIds?.map(item => item._id),
+      };
+      if (data.type === 'schedule') {
+        data.schedule = obj.schedule;
+      }
+      CAMPAIGN_MODULE.create({ ...data })
+        .then(async (response) => {
+          if (commonService.isValidObjId(response._id)) {
+            if (req.body.trigger === true) {
+              try {
+                await sendInstantMessage({ body: response }, res);
+              } catch (error) {
+                return res.status(500).json({
+                  message: CONSTANT.MESSAGE.ERROR_OCCURRED_SENDING,
+                  error: error.message,
+                });
+              }
+            } else {
+              return res.status(200).json({
+                message:
+                  CONSTANT.COLLECTION.CAMPAIGN +
+                  CONSTANT.MESSAGE.CREATE_SUCCESSFULLY,
+                data: response,
+              });
+            }
+          } else {
+            return res.status(500).send({
+              message: CONSTANT.MESSAGE.INVALID_ID,
+            });
+          }
+        })
+        .catch((e) => {
+          return res.status(404).send({
+            message: e.message || CONSTANT.MESSAGE.ERROR_OCCURRED,
+          });
+        });
+    } catch (err) {
+      return res.status(404).send({
+        message: err.message || CONSTANT.MESSAGE.ERROR_OCCURRED,
+      });
+    }
+  }
+};
+
 exports.campaignAudienceCount = async (req, res) => {
   try {
     const audience = req.body.audience;
@@ -293,6 +369,39 @@ exports.getAllCampaigns = async (req, res) => {
       await CAMPAIGN_MODULE.find({ isDeleted: false }).then((response) => {
         return res.status(200).send(response)
       })
+        .catch((err) => {
+          return res.status(404).send({
+            message: err.message || CONSTANT.MESSAGE.ERROR_OCCURRED,
+          });
+        });
+    } catch (err) {
+      return res.status(500).send({
+        message: err.message || CONSTANT.MESSAGE.ERROR_OCCURRED,
+      });
+    }
+  }
+};
+
+exports.getCampaignById = async (req, res) => {
+  const errors = validationResult(req).array();
+  if (errors && errors.length > 0) {
+    let messArr = errors.map((a) => a.msg);
+    return res.status(400).send({
+      message: CONSTANT.MESSAGE.REQUIRED_FIELDS_MISSING,
+      error: messArr.join(", "),
+    });
+  } else {
+    try {
+      const _id = req.body._id;
+      await CAMPAIGN_MODULE.findById(_id)
+        .populate({
+          path: 'audienceIds',
+          model: 'clients',
+          select: 'whatsapp_number name'
+        })
+        .then((response) => {
+          return res.status(200).send(response);
+        })
         .catch((err) => {
           return res.status(404).send({
             message: err.message || CONSTANT.MESSAGE.ERROR_OCCURRED,
@@ -599,12 +708,11 @@ const sendMarketingWhatsAppMessages = async (mobileNumbers, images, _id, caption
           },
           {
             type: "body",
-            parameters: [{ type: "text", text: caption }],
+            parameters: [{ type: "text", text: caption ? caption : "Hello" }],
           },
         ],
       },
     };
-    console.log("messageData : " + JSON.stringify(messageData));
 
     try {
       await fetch(process.env.WHATSAPP_API_URL, {
@@ -619,7 +727,6 @@ const sendMarketingWhatsAppMessages = async (mobileNumbers, images, _id, caption
           if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
           }
-
           const data = await response.json();
           // return data;
         }).catch((error) => {
@@ -654,14 +761,12 @@ const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, 
       facebookID: user[0].facebookID,
       profilePicUrl: user[0].profile_picture?.url,
       logoImage: user[0].company_profile_picture?.url,
-      userWebsite: "www.google.com",
-      // userWebsite: user[0].website,
+      userWebsite: user[0].website,
       selectedRefTemplate: refTemplate,
       imagePath: images
     });
     const absoluteTempImagePath = path.resolve(tempImagePath);
-    const imageUrl = `http://localhost:8080/./public/schedule_utility/${path.basename(absoluteTempImagePath)}`;
-
+    const imageUrl = `${process.env.BACKEND_URL}` + "./public/schedule_utility/" + `${path.basename(absoluteTempImagePath)}`;
     const messageData = {
       messaging_product: "whatsapp",
       recepient_type: "individual",
@@ -677,15 +782,13 @@ const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, 
           },
           {
             type: "body",
-            parameters: [{ type: "text", text: caption }],
+            parameters: [{ type: "text", text: (caption ? caption : "Hello") }],
           },
         ],
       },
     };
 
     try {
-      console.log("messageData : ", messageData);
-
       await fetch(process.env.WHATSAPP_API_URL, {
         method: 'POST',
         headers: {
@@ -695,12 +798,10 @@ const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, 
         body: JSON.stringify(messageData)
       })
         .then(async (response) => {
-          // if (!response.ok) {
-          //   throw new Error(`HTTP error! status: ${response.status}`);
-          // }
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
           const responseBody = await response.json();
-          console.log("Response body:", responseBody);
-
           // return data;
         }).catch((error) => {
           return error.message
@@ -803,9 +904,27 @@ const editUtilityImage = async ({
             if (logoResponse.ok) {
               const logoBuffer = await logoResponse.buffer();
               const logoImageLoaded = await loadImage(logoBuffer);
-              const logoWidth = parseFloat(fontSize);
-              const logoHeight = parseFloat(fontSize);
-              ctx.drawImage(logoImageLoaded, x, y, logoWidth, logoHeight);
+
+              const originalWidth = logoImageLoaded.width;
+              const originalHeight = logoImageLoaded.height;
+
+              let logoWidth, logoHeight;
+              if (originalWidth > originalHeight) {
+                logoWidth = parseFloat(fontSize);
+                logoHeight = (originalHeight / originalWidth) * logoWidth;
+              } else {
+                logoHeight = parseFloat(fontSize);
+                logoWidth = (originalWidth / originalHeight) * logoHeight;
+              }
+              if (logoHeight < 140) {
+                logoHeight = 140;
+                logoWidth = (originalWidth / originalHeight) * logoHeight;
+              }
+              const centerX = x;
+              const centerY = y;
+              const drawX = centerX - logoWidth / 2;
+              const drawY = centerY - logoHeight / 2;
+              ctx.drawImage(logoImageLoaded, drawX, drawY, logoWidth, logoHeight);
               continue;
             };
           } else {
@@ -815,7 +934,8 @@ const editUtilityImage = async ({
 
         ctx.font = `${fontWeight} ${fontStyle} ${parseFloat(fontSize)}px ${fontFamily}`;
         ctx.fillStyle = fillColor;
-        ctx.textAlign = 'left';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'center';
 
         if (textDecoration === 'underline') {
           const textWidth = ctx.measureText(stripHtmlTags(updatedContent)).width;
@@ -833,8 +953,8 @@ const editUtilityImage = async ({
       }
     }
 
-    const tempImagePath = path.join(CONSTANT.UPLOAD_DOC_PATH.SCHEDULE_UTILITY, `edited_image.png`);
-    const buffer = canvas.toBuffer('image/png');
+    const tempImagePath = path.join(CONSTANT.UPLOAD_DOC_PATH.SCHEDULE_UTILITY, `edited_image.jpeg`);
+    const buffer = canvas.toBuffer('image/jpeg');
     if (buffer.length === 0) {
       throw new Error('The buffer is empty, cannot write to file.');
     }
