@@ -365,8 +365,8 @@ exports.createClient = async (req, res) => {
         const { name, _ } = commonService.getUserIdFromToken(req);
         let obj = { ...req.body };
 
-        const mobileNum = `+91${obj.mobile_number}`;
-        const extUser = await CLIENT_COLLECTION.findOne({ whatsapp_number: mobileNum });
+        const whatsappNum = `+91${obj.whatsapp_number}`;
+        const extUser = await CLIENT_COLLECTION.findOne({ whatsapp_number: whatsappNum });
         if (extUser) {
           return res.status(401).send({ message: CONSTANT.MESSAGE.USER_EXIST, data: extUser });
         }
