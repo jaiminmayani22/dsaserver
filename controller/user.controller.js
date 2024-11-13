@@ -137,7 +137,7 @@ exports.loginUser = (req, res) => {
 
 exports.verifyToken = (req, res) => {
   try {
-    res.status(200).send({message: CONSTANT.MESSAGE.TOKEN_VERIFIED});
+    res.status(200).send({ message: CONSTANT.MESSAGE.TOKEN_VERIFIED });
   } catch (error) {
     return res.status(500).send({
       message: error.message || CONSTANT.MESSAGE.ERROR_OCCURRED,
@@ -393,7 +393,7 @@ exports.createClient = async (req, res) => {
           name: obj.name || "",
           company_name: obj.company_name || "",
           mobile_number: obj.mobile_number ? `+91${obj.mobile_number}` : "",
-          whatsapp_number: obj.whatsapp_number ? `+91${obj.whatsapp_number}` : "",          
+          whatsapp_number: obj.whatsapp_number ? `+91${obj.whatsapp_number}` : "",
           email: obj.email || "",
           city: obj.city || "",
           district: obj.district || "",
@@ -1112,7 +1112,18 @@ exports.importClientFromCSV = async (req, res) => {
     fs.createReadStream(req.file.path)
       .pipe(csv())
       .on("data", async (clientData) => {
+        if (!clientData.Name && !clientData.Whatsapp_Number && !clientData.Email && !clientData.Mobile_Number) {
+          return;
+        }
         let { Mobile_Number, Whatsapp_Number } = clientData;
+        if (!Whatsapp_Number && clientData.Name !== null) {
+          results.push({
+            action: "invalid",
+            reason: "WhatsApp Number is required",
+            client: clientData
+          });
+          return;
+        }
 
         const sanitizePhoneNumber = (number) => {
           if (number) {
@@ -1121,19 +1132,37 @@ exports.importClientFromCSV = async (req, res) => {
               return `+91${sanitizedNumber}`;
             }
           }
-        
           return null;
         };
 
-        Mobile_Number = sanitizePhoneNumber(Mobile_Number);
-        const invalidPhoneNumber = !Mobile_Number; 
-
         Whatsapp_Number = sanitizePhoneNumber(Whatsapp_Number);
-        const invalidWhatsappNumber = !Whatsapp_Number;
+        if (!Whatsapp_Number) {
+          results.push({
+            action: "invalid",
+            reason: "Invalid WhatsApp Number",
+            client: clientData
+          });
+          return;
+        }
 
+        if (Mobile_Number) {
+          Mobile_Number = sanitizePhoneNumber(Mobile_Number);
+          const invalidMobileNumber = !Mobile_Number;
+
+          if (invalidMobileNumber) {
+            results.push({
+              action: "invalid",
+              reason: "Invalid Mobile Number",
+              client: clientData
+            });
+            return;
+          }
+        }
         const existingClient = await CLIENT_COLLECTION.findOne({
-          mobile_number: Mobile_Number,
+          whatsapp_number: Whatsapp_Number,
         });
+        console.log("existingClient : ", existingClient);
+
         selectedGroup = req.query.groupId;
 
         const clientObj = {
@@ -1148,9 +1177,7 @@ exports.importClientFromCSV = async (req, res) => {
           instagramID: clientData?.InstagramID,
           facebookID: clientData?.FacebookID,
           isFavorite: clientData?.Is_Favorite,
-          groupId: selectedGroup ? selectedGroup : clientData?.Group_ID,
-          invalidWhatsappNumber,
-          invalidPhoneNumber,
+          groupId: selectedGroup ? selectedGroup : clientData?.Group_ID
         };
 
         const groupIds = clientObj?.groupId
@@ -1176,17 +1203,24 @@ exports.importClientFromCSV = async (req, res) => {
         }
       })
       .on("end", async () => {
+        const importedWhatsappNumbers = results
+          .filter(item => item.action === "inserted" || item.action === "updated")
+          .map(item => item.client.whatsapp_number);
         if (selectedGroup) {
           const contactList = await CLIENT_COLLECTION.find({
-            groupId: { $regex: new RegExp(`(^|,)${selectedGroup}(,|$)`) }
+            groupId: { $regex: new RegExp(`(^|,)${selectedGroup}(,|$)`) },
+            whatsapp_number: { $in: importedWhatsappNumbers }
           });
+
           res.status(200).send({
             message: "Clients imported successfully",
             data: contactList,
             changes: results
           });
         } else {
-          const contactList = await CLIENT_COLLECTION.find();
+          const contactList = await CLIENT_COLLECTION.find({
+            whatsapp_number: { $in: importedWhatsappNumbers }
+          });
           res.status(200).send({
             message: "Clients imported successfully",
             data: contactList,
@@ -1230,7 +1264,7 @@ exports.createGroup = async (req, res) => {
         if (latestGroup) {
           const nextId = parseInt(latestGroup.groupId, 10) + 1;
           return nextId.toString().padStart(3, '0');
-        } else {  
+        } else {
           return '001';
         }
       }

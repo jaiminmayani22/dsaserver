@@ -475,6 +475,7 @@ module.exports = Object.freeze({
 
   TEMPLATE_NAME: {
     FOR_IMAGE: "schedule_msg_wt_custom",
-    FOR_VIDEO: "schedule_msg_wt_vdo"
+    FOR_VIDEO: "schedule_msg_wt_vdo",
+    FOR_ONLY_TEXT: "wt_only_text"
   }
 });

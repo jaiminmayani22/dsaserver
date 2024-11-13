@@ -45,7 +45,11 @@ app.use(express.json({ limit: "5mb" }));
 app.use(cors(corsOptions));
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
-app.use("/public", express.static("public"));
+app.use("/public", express.static("public", {
+  setHeaders: (res, path) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+  }
+}));
 app.use(express.urlencoded({ extended: true }));
 app.use(helmet());
 app.use(helmet.referrerPolicy());

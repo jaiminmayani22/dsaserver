@@ -247,6 +247,34 @@ exports.createCampaignUtility = async (req, res, folder) => {
   }
 };
 
+exports.duplicateCampaign = async (req, res) => {
+  const { id } = req.params;
+  const name = req.body.name;
+  try {
+    const originalCampaign = await CAMPAIGN_MODULE.findById(id);
+    if (!originalCampaign) {
+      return res.status(404).json({ message: "Original campaign not found" });
+    }
+
+    const existCampaign = await CAMPAIGN_MODULE.find({ name: name });
+    if (!existCampaign) {
+      return res.status(403).json({ message: `Campaign With name "${name}" already Exist ! Please Use Different Name.` });
+    }
+
+    const { createdAt, updatedAt, _id, ...rest } = originalCampaign.toObject();
+    const duplicateData = { ...rest, name };
+    const newCampaign = await CAMPAIGN_MODULE.create(duplicateData);
+
+    res.status(200).json({
+      message: "Duplicate campaign created successfully",
+      data: newCampaign
+    });
+  } catch (error) {
+    console.error("Error duplicating campaign:", error);
+    res.status(500).json({ message: "Error duplicating campaign", error });
+  }
+};
+
 /*
 Method: Post
 Todo: Retarget Campaign
@@ -398,6 +426,10 @@ exports.getCampaignById = async (req, res) => {
           path: 'audienceIds',
           model: 'clients',
           select: 'whatsapp_number name'
+        })
+        .populate({
+          path: 'selectedRefTemplate',
+          model: 'templateReferenceFormat',
         })
         .then((response) => {
           return res.status(200).send(response);
@@ -668,7 +700,7 @@ const sendInstantMessage = async (req, res) => {
   });
 
   const imageUrl = document.url;
-  if (messageType === 'marketing') {
+  if (messageType === 'marketing' && imageUrl) {
     try {
       await sendMarketingWhatsAppMessages(mobileNumbers, imageUrl, _id, caption);
       return res.status(200).json({
@@ -677,7 +709,7 @@ const sendInstantMessage = async (req, res) => {
     } catch (error) {
       return Promise.reject(error);
     }
-  } else {
+  } else if (messageType === 'utility' && imageUrl) {
     const selectedRefTemplate = req.body.selectedRefTemplate;
     try {
       await sendUtilityWhatsAppMessages(mobileNumbers, imageUrl, _id, caption, selectedRefTemplate);
@@ -687,7 +719,16 @@ const sendInstantMessage = async (req, res) => {
     } catch (error) {
       return Promise.reject(error);
     }
-  }
+  } else if (!imageUrl && caption) {
+    try {
+      await sendTextWhatsAppMessages(mobileNumbers, _id, caption);
+      return res.status(200).json({
+        message: CONSTANT.COLLECTION.CAMPAIGN + CONSTANT.MESSAGE.CREATE_SENT_SUCCESSFULLY,
+      });
+    } catch (error) {
+      return Promise.reject(error);
+    }
+  };
 };
 exports.sendMessage = sendInstantMessage;
 
@@ -696,7 +737,7 @@ const sendMarketingWhatsAppMessages = async (mobileNumbers, images, _id, caption
   for (const mobileNumber of mobileNumbers) {
     const messageData = {
       messaging_product: "whatsapp",
-      to: `+91${mobileNumber}`,
+      to: `${mobileNumber}`,
       type: "template",
       template: {
         name: CONSTANT.TEMPLATE_NAME.FOR_IMAGE,
@@ -706,6 +747,49 @@ const sendMarketingWhatsAppMessages = async (mobileNumbers, images, _id, caption
             type: "header",
             parameters: [{ type: "image", image: { link: images } }],
           },
+          {
+            type: "body",
+            parameters: [{ type: "text", text: caption ? caption : "Hello" }],
+          },
+        ],
+      },
+    };
+
+    try {
+      await fetch(process.env.WHATSAPP_API_URL, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.WHATSAPP_API_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(messageData)
+      })
+        .then(async (response) => {
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          const data = await response.json();
+          // return data;
+        }).catch((error) => {
+          return error.message
+        });
+    } catch (error) {
+      console.error(`Failed to send message to ${mobileNumber}:`, error);
+    }
+  }
+  await updateMessageStatus(_id, 'completed');
+};
+
+const sendTextWhatsAppMessages = async (mobileNumbers, _id, caption) => {
+  for (const mobileNumber of mobileNumbers) {
+    const messageData = {
+      messaging_product: "whatsapp",
+      to: `${mobileNumber}`,
+      type: "template",
+      template: {
+        name: CONSTANT.TEMPLATE_NAME.FOR_ONLY_TEXT,
+        language: { code: "en" },
+        components: [
           {
             type: "body",
             parameters: [{ type: "text", text: caption ? caption : "Hello" }],
