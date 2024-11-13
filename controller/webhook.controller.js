@@ -1,9 +1,6 @@
 const MESSAGE_LOG = require("../module/messageLog.module");
 const RECEIVED_MESSAGE = require("../module/receivedMessage.module");
-const CLIENT_MODULE = require("../module/client.module");
 const CONSTANT = require("../common/constant");
-const commonService = require("../common/common");
-const { validationResult } = require("express-validator");
 
 /*
 Method: POST
@@ -12,17 +9,11 @@ Todo: Webhook
 exports.webhookPost = async (req, res) => {
     try {
         const body_params = req.body;
-        console.log(JSON.stringify(body_params), null, 2);
-
-        // Handle incoming messages
-        await processWhatsappMessages(data);
-        console.log("Process Whatsapp Message Done", JSON.stringify(data));
-
-        // Update WhatsApp statuses
-        console.log("JSON.stringify(data) : ", JSON.stringify(data));
-
-        await updateWhatsappStatuses(JSON.stringify(data));
-
+        if (body_params.entry[0]?.changes[0]?.value?.messages) {
+            await processWhatsappMessages(body_params);
+        } else {
+            await updateWhatsappStatuses(JSON.stringify(body_params));
+        }        
         res.status(200).send({ message: CONSTANT.MESSAGE.WEBHOOK_SUCCESS });
     } catch (err) {
         return res.status(500).send({
@@ -53,28 +44,6 @@ exports.webhookGet = async (req, res) => {
     }
 };
 
-// Function to handle the received message and insert into MongoDB
-async function processWhatsappMessages(data) {
-    try {
-        const receivedMessages = await getAllWhatsappMessages(data);
-
-        for (const msg of receivedMessages) {
-            const newReceivedMessage = new RECEIVED_MESSAGE({
-                from: msg.from,
-                fromName: msg.fromName,
-                message: msg.message
-            });
-
-            await newReceivedMessage.save();
-            const responseMessage = "Hello! Thank you for reaching out. Call us at 9727427410 for more information!";
-            await sendWhatsappTextMessage(msg.from, responseMessage);
-        }
-    } catch (error) {
-        console.error('Error processing WhatsApp messages:', error);
-        throw error;
-    }
-}
-
 // Simulating the WhatsApp API call for sending a text message
 async function sendWhatsappTextMessage(to, message) {
     try {
@@ -85,10 +54,19 @@ async function sendWhatsappTextMessage(to, message) {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                messaging_product: 'whatsapp',
+                messaging_product: "whatsapp",
                 to: `+${to}`,
-                type: 'text',
-                text: { body: message }
+                type: "template",
+                template: {
+                    name: CONSTANT.TEMPLATE_NAME.FOR_ONLY_TEXT,
+                    language: { code: "en" },
+                    components: [
+                        {
+                            type: "body",
+                            parameters: [{ type: "text", text: message ? message : "Hello! Thanks for reaching out to us." }],
+                        },
+                    ],
+                },
             })
         }).then(response => {
             if (!response.ok) {
@@ -108,22 +86,18 @@ async function sendWhatsappTextMessage(to, message) {
 async function updateWhatsappStatuses(data) {
     try {
         const parsedData = JSON.parse(data);
-
         for (const entry of parsedData.entry) {
             for (const change of entry.changes) {
                 const value = change.value;
                 if (value.statuses) {
-                    console.log("value.statuses : ", value.statuses);
                     for (const status of value.statuses) {
-                        console.log("Status : ", status);
-
                         await MESSAGE_LOG.updateOne(
                             { waMessageId: status.id },
                             {
-                                status: status,
+                                status: status.status,
                                 updatedAt: new Date()
                             }
-                        );
+                        ).then((data) => console.log(data));
                     }
                 }
             }
@@ -134,18 +108,42 @@ async function updateWhatsappStatuses(data) {
     }
 }
 
+// Function to handle the received message and insert into MongoDB
+async function processWhatsappMessages(data) {
+    try {
+        const receivedMessages = await getAllWhatsappMessages(data);
+        for (const msg of receivedMessages) {
+            const newReceivedMessage = new RECEIVED_MESSAGE({
+                from: msg.from,
+                fromName: msg.fromName,
+                message: msg.message
+            });
+
+            await newReceivedMessage.save();
+            const responseMessage = "Hello! Thank you for reaching out. Call us at 9727427410 for more information!";
+            await sendWhatsappTextMessage(msg.from, responseMessage);
+        }
+    } catch (error) {
+        console.error('Error processing WhatsApp messages:', error);
+        throw error;
+    }
+}
+
 // Function to extract received messages
 async function getAllWhatsappMessages(data) {
     const receivedMessages = [];
-
     if (data.entry && Array.isArray(data.entry)) {
         for (const entry of data.entry) {
+            console.log("entry : ", entry);
+
             if (entry.changes && Array.isArray(entry.changes)) {
                 for (const change of entry.changes) {
                     const value = change.value;
                     if (value.messages && Array.isArray(value.messages)) {
                         let index = 0;
                         for (const message of value.messages) {
+                            console.log("message : ", message);
+
                             const profile = value.contacts[index++];
 
                             const messageObject = {
