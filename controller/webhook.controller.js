@@ -1,6 +1,8 @@
 const MESSAGE_LOG = require("../module/messageLog.module");
 const RECEIVED_MESSAGE = require("../module/receivedMessage.module");
 const CONSTANT = require("../common/constant");
+const fs = require('fs');
+const path = require('path');
 
 /*
 Method: POST
@@ -13,7 +15,7 @@ exports.webhookPost = async (req, res) => {
             await processWhatsappMessages(body_params);
         } else {
             await updateWhatsappStatuses(JSON.stringify(body_params));
-        }        
+        }
         res.status(200).send({ message: CONSTANT.MESSAGE.WEBHOOK_SUCCESS });
     } catch (err) {
         return res.status(500).send({
@@ -91,13 +93,30 @@ async function updateWhatsappStatuses(data) {
                 const value = change.value;
                 if (value.statuses) {
                     for (const status of value.statuses) {
-                        await MESSAGE_LOG.updateOne(
+                        await MESSAGE_LOG.findOneAndUpdate(
                             { waMessageId: status.id },
                             {
                                 status: status.status,
                                 updatedAt: new Date()
+                            },
+                            { returnDocument: "after" }
+                        ).then((updatedData) => {
+                            if (updatedData && (status.status === "read" || status.status === "failed")) {
+                                const { camId, mobileNumber } = updatedData;
+                                const sanitizedNumber = mobileNumber.replace('+', '');
+                                const tempImagePath = path.join(
+                                    CONSTANT.UPLOAD_DOC_PATH.SCHEDULE_UTILITY_EDITED,
+                                    `${camId}_${sanitizedNumber}.jpeg`
+                                );
+                                fs.unlink(tempImagePath, (err) => {
+                                    if (err) {
+                                        console.error(`Failed to delete image: ${tempImagePath}`, err);
+                                    } else {
+                                        console.log(`Successfully deleted image: ${tempImagePath}`);
+                                    }
+                                });
                             }
-                        ).then((data) => console.log(data));
+                        });
                     }
                 }
             }

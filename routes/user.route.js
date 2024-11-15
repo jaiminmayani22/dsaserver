@@ -61,6 +61,7 @@ router.get("/getClientById/:id", auth, userCtrl.getClientById);
 
 router.put("/updateClientById/:id", auth, userCtrl.updateClientById);
 router.post("/updateClientProfile", auth, userCtrl.updateClientProfile);
+router.post("/updateClientCompanyProfile", auth, userCtrl.updateClientCompanyProfile);
 router.post("/bulkProfilePictureUpload", auth, uploadProfile.array('profile_picture', 500), userCtrl.bulkProfilePictureUpload);
 router.post("/bulkCompanyProfilePictureUpload", auth, uploadCompanyProfile.array('company_profile_picture', 500), userCtrl.bulkCompanyProfilePictureUpload);
 

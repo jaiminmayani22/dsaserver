@@ -680,7 +680,8 @@ const editUtilityImage = async ({
   logoImage,
   userWebsite,
   selectedRefTemplate,
-  imagePath }) => {
+  imagePath,
+  _id }) => {
 
   try {
     const tempFolder = path.join(__dirname, 'temp');
@@ -796,7 +797,8 @@ const editUtilityImage = async ({
       }
     }
 
-    const tempImagePath = path.join(CONSTANT.UPLOAD_DOC_PATH.SCHEDULE_UTILITY, `edited_image.jpeg`);
+    const sanitizedNumber = number.replace('+', '');
+    const tempImagePath = path.join(CONSTANT.UPLOAD_DOC_PATH.SCHEDULE_UTILITY_EDITED, `${_id}_${sanitizedNumber}.jpeg`);
     const buffer = canvas.toBuffer('image/jpeg');
     if (buffer.length === 0) {
       throw new Error('The buffer is empty, cannot write to file.');
@@ -814,8 +816,6 @@ const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, 
     throw new Error('Template not found');
   }
   for (const mobileNumber of mobileNumbers) {
-    console.log("mobileNumber : ", mobileNumber);
-
     const user = await CLIENT_MODULE.find({ whatsapp_number: mobileNumber });
     if (!user) {
       console.error(`User not found for mobile number: ${mobileNumber}`);
@@ -833,10 +833,11 @@ const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, 
       logoImage: user[0].company_profile_picture?.url,
       userWebsite: user[0].website,
       selectedRefTemplate: refTemplate,
-      imagePath: images
+      imagePath: images,
+      _id: _id
     });
     const absoluteTempImagePath = path.resolve(tempImagePath);
-    const imageUrl = `${process.env.BACKEND_URL}` + "./public/schedule_utility/" + `${path.basename(absoluteTempImagePath)}`;
+    const imageUrl = `${process.env.BACKEND_URL}` + CONSTANT.UPLOAD_DOC_PATH.SCHEDULE_UTILITY_EDITED + "/" + `${path.basename(absoluteTempImagePath)}`;
     const messageData = {
       messaging_product: "whatsapp",
       recepient_type: "individual",
@@ -852,7 +853,7 @@ const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, 
           },
           {
             type: "body",
-            parameters: [{ type: "text", text: (caption ? caption : "Hello") }],
+            parameters: [{ type: "text", text: (caption ? caption : "") }],
           },
         ],
       },
@@ -860,13 +861,13 @@ const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, 
 
     await whatsappAPISend(messageData, _id, messageType, caption);
 
-    fs.unlink(absoluteTempImagePath, (err) => {
-      if (err) {
-        console.error(`Error deleting file: ${absoluteTempImagePath}`, err);
-      } else {
-        console.log(`Successfully deleted file: ${absoluteTempImagePath}`);
-      }
-    });
+    // fs.unlink(absoluteTempImagePath, (err) => {
+    //   if (err) {
+    //     console.error(`Error deleting file: ${absoluteTempImagePath}`, err);
+    //   } else {
+    //     console.log(`Successfully deleted file: ${absoluteTempImagePath}`);
+    //   }
+    // });
   }
   await updateCampaignStatus(_id, 'completed');
 };

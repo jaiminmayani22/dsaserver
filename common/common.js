@@ -307,7 +307,10 @@ function _pictureUploadFunction(profile, companyProfile, req, res, callback) {
   var type;
   var fileType = "";
   var userData = { ...req.decoded };
-  const whatsapp_number = req.query.whatsapp_number;
+  const number = req.query.whatsapp_number;
+  const whatsapp_number = String(number).trim().replace('+', '');
+
+  console.log("data : ", profile, companyProfile, req, res, callback);
 
   var storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -322,22 +325,11 @@ function _pictureUploadFunction(profile, companyProfile, req, res, callback) {
     filename: (req, file, cb) => {
       fileType = path.extname(file.originalname);
       type = file.fieldname;
-      var name = _UUID();
       var date = new Date().getTime();
+      file_name = whatsapp_number + path.extname(file.originalname);
+      cb(null, file_name);
 
-      if (!req) {
-        file_name =
-          type === CONSTANT.FIELD.PROFILE_PICTURE
-            ? whatsapp_number + path.extname(file.originalname)
-            : whatsapp_number + path.extname(file.originalname);
-        cb(null, file_name);
-      } else {
-        file_name =
-          type === CONSTANT.FIELD.PROFILE_PICTURE
-            ? whatsapp_number + path.extname(file.originalname)
-            : whatsapp_number + path.extname(file.originalname);
-        cb(null, file_name);
-      }
+      console.log("type : ", type);
 
       if (
         type === CONSTANT.FIELD.ATTACHMENT ||

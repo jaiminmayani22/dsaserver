@@ -893,6 +893,7 @@ exports.updateClientProfile = async (req, res) => {
     const folder = CONSTANT.UPLOAD_DOC_PATH.PROFILE_PIC_PATH;
     commonService.pictureUploadFunction(
       folder,
+      "",
       req,
       res,
       async (err, files) => {
@@ -919,7 +920,62 @@ exports.updateClientProfile = async (req, res) => {
             .then((result) => {
               return res.status(200).send({
                 message: CONSTANT.MESSAGE.PROFILE_UPDATE,
-                profileImg: obj.attachment.url,
+                profileImg: obj.profile_picture.url,
+              });
+            })
+            .catch((e) => {
+              return res.status(404).send({
+                message: e.message || CONSTANT.MESSAGE.ERROR_OCCURRED,
+              });
+            });
+        }
+      }
+    );
+  } catch (err) {
+    return res.status(404).send({
+      message: err.message || CONSTANT.MESSAGE.ERROR_OCCURRED,
+    });
+  }
+};
+
+exports.updateClientCompanyProfile = async (req, res) => {
+  try {
+    const folder = CONSTANT.UPLOAD_DOC_PATH.COMPANY_PROFILE_PIC_PATH;
+    commonService.pictureUploadFunction("",
+      folder,
+      req,
+      res,
+      async (err, files) => {
+        if (err && files && files.length <= 0) {
+          return res.status(400).send({
+            message: err.message || CONSTANT.MESSAGE.PROFILE_NOT_UPDATE,
+          });
+        } else {
+          let obj = {};
+          const id = req.body._id;
+          console.log("files:", files);
+
+          if (files && files.length > 0 && files[0][CONSTANT.COMMON.FILE_NAME]) {
+            obj[CONSTANT.FIELD.COMPANY_PROFILE_PICTURE][CONSTANT.COMMON.URL] =
+              process.env.BACKEND_URL +
+              folder +
+              "/" +
+              files[0][CONSTANT.COMMON.FILE_NAME];
+          } else {
+            return res.status(404).send({
+              message: CONSTANT.MESSAGE.ERROR_OCCURRED,
+            });
+          }
+
+          CLIENT_COLLECTION.findByIdAndUpdate(
+            id,
+            { company_profile_picture: obj.company_profile_picture },
+            { new: true }
+          )
+            .then((result) => {
+              return res.status(200).send({
+                message: CONSTANT.MESSAGE.COMPANY_PROFILE_UPDATE,
+                profileImg: obj.company_profile_picture.url,
               });
             })
             .catch((e) => {
@@ -947,10 +1003,10 @@ exports.bulkProfilePictureUpload = async (req, res) => {
 
     const profileFiles = req.files;
     const updatePromises = profileFiles.map(async (file) => {
-      const mobileNumber = file.originalname.split('.')[0];
+      const whatsappNumber = file.originalname.split('.')[0];
       const profilePictureUrl = `${process.env.BACKEND_URL}${CONSTANT.UPLOAD_DOC_PATH.PROFILE_PIC_PATH}/${file.filename}`;
       return CLIENT_COLLECTION.findOneAndUpdate(
-        { mobile_number: mobileNumber },
+        { whatsapp_number: `+${whatsappNumber}` },
         { $set: { 'profile_picture.url': profilePictureUrl } },
         { new: true }
       );
@@ -987,11 +1043,11 @@ exports.bulkCompanyProfilePictureUpload = async (req, res) => {
 
     const profileFiles = req.files;
     const updatePromises = profileFiles.map(async (file) => {
-      const mobileNumber = file.originalname.split('.')[0];
+      const whatsappNumber = file.originalname.split('.')[0];
       const profilePictureUrl = `${process.env.BACKEND_URL}${CONSTANT.UPLOAD_DOC_PATH.COMPANY_PROFILE_PIC_PATH}/${file.filename}`;
 
       return CLIENT_COLLECTION.findOneAndUpdate(
-        { mobile_number: mobileNumber },
+        { whatsapp_number: `+${whatsappNumber}` },
         { $set: { 'company_profile_picture.url': profilePictureUrl } },
         { new: true }
       );
