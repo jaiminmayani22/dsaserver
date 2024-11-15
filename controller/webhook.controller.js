@@ -134,18 +134,13 @@ async function getAllWhatsappMessages(data) {
     const receivedMessages = [];
     if (data.entry && Array.isArray(data.entry)) {
         for (const entry of data.entry) {
-            console.log("entry : ", entry);
-
             if (entry.changes && Array.isArray(entry.changes)) {
                 for (const change of entry.changes) {
                     const value = change.value;
                     if (value.messages && Array.isArray(value.messages)) {
                         let index = 0;
                         for (const message of value.messages) {
-                            console.log("message : ", message);
-
                             const profile = value.contacts[index++];
-
                             const messageObject = {
                                 from: message.from || '',
                                 fromName: profile?.profile?.name || '',

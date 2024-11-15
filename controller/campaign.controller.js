@@ -48,7 +48,7 @@ exports.createCampaignMarketing = async (req, res, folder) => {
           messageType: obj.messageType,
           documentType: obj.documentType,
           caption: obj.caption,
-          button: obj.button,
+          button: obj?.button,
           added: obj.addedBy,
           document: obj.document,
         };
@@ -102,13 +102,14 @@ exports.createCampaignMarketing = async (req, res, folder) => {
                     error: error.message,
                   });
                 }
+              } else {
+                return res.status(200).json({
+                  message:
+                    CONSTANT.COLLECTION.CAMPAIGN +
+                    CONSTANT.MESSAGE.CREATE_SUCCESSFULLY,
+                  data: response,
+                });
               }
-              return res.status(200).json({
-                message:
-                  CONSTANT.COLLECTION.CAMPAIGN +
-                  CONSTANT.MESSAGE.CREATE_SUCCESSFULLY,
-                data: response,
-              });
             } else {
               return res.status(500).send({
                 message: CONSTANT.MESSAGE.INVALID_ID,
@@ -896,9 +897,9 @@ const whatsappAPISend = async (messageData, _id, messageType, caption) => {
         };
         await MESSAGE_LOG.create(obj);
       }).catch((error) => {
-        return error.message
+        return console.error(error.message);
       });
   } catch (error) {
-    console.error(`Failed to send message to ${mobileNumber}:`, error);
+    return console.error(`Failed to send message to ${mobileNumber}:`, error);
   }
 };
