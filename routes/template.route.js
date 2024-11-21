@@ -24,6 +24,4 @@ router.post("/getAllVariables", templateCtrl.getAllVariables)
 router.post("/getVariableById/:id", templateCtrl.getVariableById)
 router.delete("/deleteVariableById/:id", templateCtrl.deleteVariableById)
 
-router.post("/testAPI", templateCtrl.testAPI)
-router.post("/processVideo", templateCtrl.processVideo)
 module.exports = router;

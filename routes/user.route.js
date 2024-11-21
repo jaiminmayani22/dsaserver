@@ -53,7 +53,6 @@ router.post(
 
 // CLIENT ROUTES
 router.post("/createClient", auth, userCtrl.createClient);
-// router.post("/createClient", auth, createUserValidators, userCtrl.createClient);
 
 router.post("/getAllClient", auth, userCtrl.getAllClient);
 router.post("/getAllClientCount", auth, userCtrl.getAllClientCount);
@@ -67,9 +66,6 @@ router.post("/bulkCompanyProfilePictureUpload", auth, uploadCompanyProfile.array
 
 router.delete("/deleteClientById/:id", auth, userCtrl.deleteClientById);
 router.post("/deleteClients", auth, userCtrl.deleteClients);
-
-router.post("/checkWhatsappUser", userCtrl.checkWhatsappUser);
-// router.post("/checkWhatasappUser", auth, userCtrl.checkWhatsappUser);
 
 //GROUP ROUTES
 router.post("/createGroup", auth, userCtrl.createGroup);
