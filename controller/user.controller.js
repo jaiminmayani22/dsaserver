@@ -366,7 +366,7 @@ exports.createClient = async (req, res) => {
         let obj = { ...req.body };
 
         const whatsappNum = `+91${obj.whatsapp_number}`;
-        const extUser = await CLIENT_COLLECTION.findOne({ whatsapp_number: whatsappNum });
+        const extUser = await CLIENT_COLLECTION.findOne({ whatsapp_number: whatsappNum, isDeleted: false });
         if (extUser) {
           return res.status(401).send({ message: CONSTANT.MESSAGE.USER_EXIST, data: extUser });
         }
@@ -393,7 +393,7 @@ exports.createClient = async (req, res) => {
           name: obj.name || "",
           company_name: obj.company_name || "",
           mobile_number: obj.mobile_number ? `+91${obj.mobile_number}` : "",
-          whatsapp_number: obj.whatsapp_number ? `+91${obj.whatsapp_number}` : "",
+          whatsapp_number: whatsappNum,
           email: obj.email || "",
           city: obj.city || "",
           district: obj.district || "",
@@ -1233,6 +1233,7 @@ exports.importClientFromCSV = async (req, res) => {
 
             const existingClient = await CLIENT_COLLECTION.findOne({
               whatsapp_number: Whatsapp_Number,
+              isDeleted: false,
             });
 
             const clientObj = {
