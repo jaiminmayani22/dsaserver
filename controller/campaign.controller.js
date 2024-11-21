@@ -40,7 +40,12 @@ exports.createCampaignMarketing = async (req, res, folder) => {
             "/" +
             files[0][CONSTANT.COMMON.FILE_NAME];
         }
-
+        const existing = await CAMPAIGN_MODULE.findOne({ name: obj.name });
+        if (existing) {
+          return res.status(500).json({
+            message: CONSTANT.MESSAGE.CAMPAIGN_EXIST_ERROR,
+          });
+        }
         let data = {
           name: obj.name,
           type: obj.type,
@@ -567,7 +572,7 @@ exports.getMessageLog = async (req, res) => {
 
 // FUNCTIONS FOR WHATSAPP MESSAGE
 const sendInstantMessage = async (req, res) => {
-  const { _id, caption, messageType, document, audienceIds } = req.body;
+  const { _id, caption, messageType, document, audienceIds, documentType } = req.body;
 
   const mobileNumbers = [];
   const clients = await CLIENT_MODULE.find({ _id: { $in: audienceIds } });
@@ -580,7 +585,7 @@ const sendInstantMessage = async (req, res) => {
   const imageUrl = document.url;
   if (messageType === 'marketing' && imageUrl) {
     try {
-      await sendMarketingWhatsAppMessages(mobileNumbers, imageUrl, _id, caption, messageType);
+      await sendMarketingWhatsAppMessages(mobileNumbers, imageUrl, _id, caption, messageType, documentType);
       return res.status(200).json({
         message: CONSTANT.COLLECTION.CAMPAIGN + CONSTANT.MESSAGE.CREATE_SENT_SUCCESSFULLY,
       });
@@ -619,27 +624,86 @@ const stripHtmlTags = (htmlContent) => {
   return htmlContent.replace(/<\/?[^>]+(>|$)/g, "");
 };
 
-const sendMarketingWhatsAppMessages = async (mobileNumbers, images, _id, caption, messageType) => {
+const sendMarketingWhatsAppMessages = async (mobileNumbers, images, _id, caption, messageType, documentType) => {
   for (const mobileNumber of mobileNumbers) {
-    const messageData = {
-      messaging_product: "whatsapp",
-      to: `${mobileNumber}`,
-      type: "template",
-      template: {
-        name: CONSTANT.TEMPLATE_NAME.FOR_IMAGE,
-        language: { code: "en" },
-        components: [
-          {
-            type: "header",
-            parameters: [{ type: "image", image: { link: images } }],
-          },
-          {
-            type: "body",
-            parameters: [{ type: "text", text: caption ? caption : "Hello" }],
-          },
-        ],
-      },
-    };
+    let messageData;
+    if (documentType === "image") {
+      messageData = {
+        messaging_product: "whatsapp",
+        to: `${mobileNumber}`,
+        type: "template",
+        template: {
+          name: CONSTANT.TEMPLATE_NAME.FOR_IMAGE,
+          language: { code: "en" },
+          components: [
+            {
+              type: "header",
+              parameters: [{ type: "image", image: { link: images } }],
+            },
+            {
+              type: "body",
+              parameters: [{ type: "text", text: caption ? caption : "Hello" }],
+            },
+          ],
+        },
+      };
+    } else if (documentType === "video") {
+      messageData = {
+        messaging_product: "whatsapp",
+        to: `${mobileNumber}`,
+        type: "template",
+        template: {
+          name: CONSTANT.TEMPLATE_NAME.FOR_VIDEO,
+          language: { code: "en" },
+          components: [
+            {
+              type: "header",
+              parameters: [{ type: "video", video: { link: images } }],
+            },
+            {
+              type: "body",
+              parameters: [{ type: "text", text: caption ? caption : "Hello" }],
+            },
+          ],
+        },
+      };
+    } else if (documentType === "document") {
+      messageData = {
+        messaging_product: "whatsapp",
+        to: `${mobileNumber}`,
+        type: "template",
+        template: {
+          name: CONSTANT.TEMPLATE_NAME.FOR_DOCUMENT,
+          language: { code: "en" },
+          components: [
+            {
+              type: "header",
+              parameters: [{ type: "document", document: { link: images } }],
+            },
+            {
+              type: "body",
+              parameters: [{ type: "text", text: caption ? caption : "Hello" }],
+            },
+          ],
+        },
+      };
+    } else {
+      messageData = {
+        messaging_product: "whatsapp",
+        to: `${mobileNumber}`,
+        type: "template",
+        template: {
+          name: CONSTANT.TEMPLATE_NAME.FOR_ONLY_TEXT,
+          language: { code: "en" },
+          components: [
+            {
+              type: "body",
+              parameters: [{ type: "text", text: caption ? caption : "Hello" }],
+            },
+          ],
+        },
+      };
+    }
 
     await whatsappAPISend(messageData, _id, messageType, caption);
   }

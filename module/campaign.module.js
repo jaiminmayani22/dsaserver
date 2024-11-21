@@ -18,6 +18,7 @@ const CampaignSchema = mongoose.Schema(
         messageType: { type: String, default: CONSTANT.NULL_STRING },
         addedBy: { type: String, default: CONSTANT.NULL_STRING },
         document: {},
+        documentType: { type: String, default: CONSTANT.NULL_STRING },
         selectedRefTemplate: { type: mongoose.Schema.Types.ObjectId, ref: 'templateReferenceFormat' },
         leftContent: {},
         middleContent: {},

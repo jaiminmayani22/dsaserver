@@ -5,7 +5,7 @@ const auth = require("../config/auth");
 
 router.post("/createTemplate", auth, templateCtrl.createTemplate);
 router.post("/getAllTemplates", auth, templateCtrl.getAllTemplates);
-router.delete("/deleteTemplate", auth, templateCtrl.deleteTemplate);
+router.delete("/deleteTemplate/:id", auth, templateCtrl.deleteTemplate);
 
 router.get("/sendInstantMessage", auth, templateCtrl.sendInstantMessage);
 router.get("/receivedMessagesHistory", auth, templateCtrl.receivedMessagesHistory);
@@ -17,6 +17,7 @@ router.post("/templateReferenceFormatUpload", auth, templateCtrl.templateReferen
 router.post("/getAllTemplateImages", auth, templateCtrl.getAllTemplateImages);
 router.post("/getAllTemplateFormat", auth, templateCtrl.getAllTemplateFormat);
 router.post("/getAllReferenceTemplateFormat", auth, templateCtrl.getAllReferenceTemplateFormat);
+router.delete("/deleteRefTemplate/:_id", auth, templateCtrl.deleteRefTemplate);
 
 router.post("/createVariable", templateCtrl.createVariable)
 router.post("/getAllVariables", templateCtrl.getAllVariables)

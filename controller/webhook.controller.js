@@ -38,7 +38,6 @@ exports.webhookGet = async (req, res) => {
         if (mode === "subscribe" && token === myToken) {
             res.status(200).send(challenge);
         } else {
-            console.log("Get Webhook22222");
             res.status(403).send(CONSTANT.MESSAGE.DATA_NOT_FOUND)
         }
     } else {

@@ -75,7 +75,26 @@ module.exports = Object.freeze({
   EXACT: "exact",
   SEND_ALL_CUSTOMERS: "send all customers",
   CUSTOM_SELECTION: "custom selection",
-  ALLOW_IMAGE_TYPE: ["image/jpeg", "image/png", "image/jpg", "image/heic","image/svg+xml", "video/mpeg", "video/mp4", "video/mpeg2", "video/mpeg3"],
+  ALLOW_IMAGE_TYPE: [
+    "image/jpeg", // JPEG
+    "image/png",  // PNG
+    "image/jpg",  // JPG
+    "image/heic", // HEIC
+    "image/svg+xml", // SVG
+    "video/mpeg",  // MPEG
+    "video/mp4",   // MP4
+    "video/3gp",   // 3GP
+    "video/mpeg2", // MPEG-2
+    "video/mpeg3",  // MPEG-3
+    "application/pdf", // PDF
+    "application/msword", // DOC
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // DOCX
+    "text/plain", // TXT
+    "application/vnd.ms-excel", // XLS
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // XLSX
+    "application/vnd.ms-powerpoint", // PPT
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation" // PPTX
+  ],
   MESSAGE: {
     TEMPLATE_NOT_FOUND: "Template not found",
     CAMPAIGN_NOT_FOUND: "Campaign not found",
@@ -212,12 +231,13 @@ module.exports = Object.freeze({
     USER_LOGIN: "Login successfully",
     AUTHENTICATION_TOKEN_FAIL: "Authentication token fail",
     NO_TOKEN_PROVIDED: "no token provided",
-    TOKEN_EXPIRED: "Token expired!",
+    TOKEN_EXPIRED: "Token expired! Please login again",
     TOKEN_VERIFIED: "Token verified!",
     PASSWORD_UPDATED_SUCCESSFULLY: "Password updated successfully",
     PASSWORDS_DO_NOT_MATCH: "Passwords do not match",
     ERROR_OCCURRED: "Some error occurred while retrieving data",
     ERROR_OCCURRED_SENDING: "Some error occurred while Sending Message",
+    CAMPAIGN_EXIST_ERROR: "Campaign with this name already exists, Please use another name",
     ERROR_IMPORTING: "Error while importing data",
     INVALID_SCHEDULE_TIME: "Invalid Schedule time!",
     NO_SCHEDULE_FOUND: "No schedules found for today and the current slot!",
@@ -478,6 +498,7 @@ module.exports = Object.freeze({
   TEMPLATE_NAME: {
     FOR_IMAGE: "schedule_msg_wt_custom",
     FOR_VIDEO: "schedule_msg_wt_vdo",
+    FOR_DOCUMENT: "schedule_msg_wt_doc",
     FOR_ONLY_TEXT: "wt_only_text"
   }
 });

@@ -310,8 +310,6 @@ function _pictureUploadFunction(profile, companyProfile, req, res, callback) {
   const number = req.query.whatsapp_number;
   const whatsapp_number = String(number).trim().replace('+', '');
 
-  console.log("data : ", profile, companyProfile, req, res, callback);
-
   var storage = multer.diskStorage({
     destination: (req, file, cb) => {
       if (file.fieldname === CONSTANT.FIELD.PROFILE_PICTURE) {
@@ -328,8 +326,6 @@ function _pictureUploadFunction(profile, companyProfile, req, res, callback) {
       var date = new Date().getTime();
       file_name = whatsapp_number + path.extname(file.originalname);
       cb(null, file_name);
-
-      console.log("type : ", type);
 
       if (
         type === CONSTANT.FIELD.ATTACHMENT ||
@@ -372,16 +368,15 @@ function _pictureUploadFunction(profile, companyProfile, req, res, callback) {
     storage: storage,
     fileFilter: fileFilter,
     limits: {
-      fileSize: 4 * 1024 * 1024, // Limit file size to 10MB
+      fileSize: 4 * 1024 * 1024, // Limit file size to 4MB
     },
   }).fields([
     { name: CONSTANT.FIELD.PROFILE_PICTURE },
     { name: CONSTANT.FIELD.COMPANY_PROFILE_PICTURE },
   ]);
-
   upload(req, res, (err) => {
     if (err) {
-      callback(err, []);
+      callback(err, [], []);
     } else {
       callback(null, profileFiles, companyProfileFiles);
     }
@@ -405,7 +400,6 @@ function _marketingUploadFunction(folder, req, res, callback) {
     filename: (req, file, cb) => {
       fileType = path.extname(file.originalname);
       type = file.fieldname;
-      var name = _UUID();
       var date = new Date().getTime();
 
       if (!req) {
@@ -453,7 +447,7 @@ function _marketingUploadFunction(folder, req, res, callback) {
     storage: storage,
     fileFilter: fileFilter,
     limits: {
-      fileSize: 4 * 1024 * 1024, // Limit file size to 4MB
+      fileSize: 15 * 1024 * 1024, // Limit file size to 15MB
     },
   }).fields([
     { name: CONSTANT.FIELD.DOCUMENT },

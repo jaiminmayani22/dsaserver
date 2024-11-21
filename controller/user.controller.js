@@ -742,7 +742,16 @@ exports.updateClientById = async (req, res) => {
         message: CONSTANT.MESSAGE.INVALID_ID,
       });
     } else {
-      const { email, ...updatedFields } = req.body;
+      const { ...updatedFields } = req.body;
+
+      const groupIds = updatedFields?.groupId
+        ? updatedFields.groupId.split(',').map(id => id.trim())
+        : [];
+      const normalizedGroupIds = groupIds.map(id => id.padStart(3, '0'));
+      const groups = await GROUP_COLLECTION.find({ groupId: { $in: normalizedGroupIds } });
+      const groupNames = groups.map(group => group.name).join(', ');
+      updatedFields.groupName = groupNames;
+
       const result = await CLIENT_COLLECTION.findByIdAndUpdate(
         Id,
         { ...updatedFields },
@@ -861,8 +870,6 @@ Topic: restore Multiple Clients
 exports.restoreClients = async (req, res) => {
   try {
     const ids = req.body.ids;
-    console.log("IDs : " + ids);
-
     if (!Array.isArray(ids) || ids.length === 0) {
       return res.status(400).send({ message: CONSTANT.MESSAGE.NOT_FOUND });
     }
@@ -873,8 +880,6 @@ exports.restoreClients = async (req, res) => {
     )
       .then((response) => {
         if (response.ok) {
-          console.log(response.json());
-
           res.status(200).send(ids);
         }
       })
@@ -921,6 +926,7 @@ exports.updateClientProfile = async (req, res) => {
               return res.status(200).send({
                 message: CONSTANT.MESSAGE.PROFILE_UPDATE,
                 profileImg: obj.profile_picture.url,
+                data: result,
               });
             })
             .catch((e) => {
@@ -945,7 +951,8 @@ exports.updateClientCompanyProfile = async (req, res) => {
       folder,
       req,
       res,
-      async (err, files) => {
+      async (err, profile, files) => {
+        0
         if (err && files && files.length <= 0) {
           return res.status(400).send({
             message: err.message || CONSTANT.MESSAGE.PROFILE_NOT_UPDATE,
@@ -953,19 +960,13 @@ exports.updateClientCompanyProfile = async (req, res) => {
         } else {
           let obj = {};
           const id = req.body._id;
-          console.log("files:", files);
 
-          if (files && files.length > 0 && files[0][CONSTANT.COMMON.FILE_NAME]) {
-            obj[CONSTANT.FIELD.COMPANY_PROFILE_PICTURE][CONSTANT.COMMON.URL] =
-              process.env.BACKEND_URL +
-              folder +
-              "/" +
-              files[0][CONSTANT.COMMON.FILE_NAME];
-          } else {
-            return res.status(404).send({
-              message: CONSTANT.MESSAGE.ERROR_OCCURRED,
-            });
-          }
+          obj[CONSTANT.FIELD.COMPANY_PROFILE_PICTURE] = files[0];
+          obj[CONSTANT.FIELD.COMPANY_PROFILE_PICTURE][CONSTANT.COMMON.URL] =
+            process.env.BACKEND_URL +
+            folder +
+            "/" +
+            files[0][CONSTANT.COMMON.FILE_NAME];
 
           CLIENT_COLLECTION.findByIdAndUpdate(
             id,
@@ -976,6 +977,7 @@ exports.updateClientCompanyProfile = async (req, res) => {
               return res.status(200).send({
                 message: CONSTANT.MESSAGE.COMPANY_PROFILE_UPDATE,
                 profileImg: obj.company_profile_picture.url,
+                data: result
               });
             })
             .catch((e) => {
@@ -1007,7 +1009,12 @@ exports.bulkProfilePictureUpload = async (req, res) => {
       const profilePictureUrl = `${process.env.BACKEND_URL}${CONSTANT.UPLOAD_DOC_PATH.PROFILE_PIC_PATH}/${file.filename}`;
       return CLIENT_COLLECTION.findOneAndUpdate(
         { whatsapp_number: `+${whatsappNumber}` },
-        { $set: { 'profile_picture.url': profilePictureUrl } },
+        {
+          $set: {
+            'profile_picture.url': profilePictureUrl,
+            'profile_picture.filename': file.originalname,
+          },
+        },
         { new: true }
       );
     });
@@ -1016,7 +1023,7 @@ exports.bulkProfilePictureUpload = async (req, res) => {
       .then((results) => {
         return res.status(200).send({
           message: CONSTANT.MESSAGE.PROFILE_UPDATE,
-          results,
+          results: results,
         });
       })
       .catch((updateError) => {
@@ -1025,8 +1032,6 @@ exports.bulkProfilePictureUpload = async (req, res) => {
         });
       });
   } catch (err) {
-    console.log("Error : ", err.message);
-
     return res.status(404).send({
       message: err.message || CONSTANT.MESSAGE.ERROR_OCCURRED,
     });
@@ -1048,7 +1053,12 @@ exports.bulkCompanyProfilePictureUpload = async (req, res) => {
 
       return CLIENT_COLLECTION.findOneAndUpdate(
         { whatsapp_number: `+${whatsappNumber}` },
-        { $set: { 'company_profile_picture.url': profilePictureUrl } },
+        {
+          $set: {
+            'company_profile_picture.url': profilePictureUrl,
+            'company_profile_picture.filename': file.originalname,
+          },
+        },
         { new: true }
       );
     });
@@ -1057,7 +1067,7 @@ exports.bulkCompanyProfilePictureUpload = async (req, res) => {
       .then((results) => {
         return res.status(200).send({
           message: CONSTANT.MESSAGE.PROFILE_UPDATE,
-          results,
+          results: results,
         });
       })
       .catch((updateError) => {
@@ -1162,130 +1172,140 @@ exports.importClientFromCSV = async (req, res) => {
       return res.status(400).send({ message: "No file uploaded" });
     }
 
-    const results = [];
-    let selectedGroup;
+    var results = [];
+    const selectedGroup = req.query.groupId;
+
+    const processingPromises = [];
 
     fs.createReadStream(req.file.path)
       .pipe(csv())
-      .on("data", async (clientData) => {
-        if (!clientData.Name && !clientData.Whatsapp_Number && !clientData.Email && !clientData.Mobile_Number) {
-          return;
-        }
-        let { Mobile_Number, Whatsapp_Number } = clientData;
-        if (!Whatsapp_Number && clientData.Name !== null) {
-          results.push({
-            action: "invalid",
-            reason: "WhatsApp Number is required",
-            client: clientData
-          });
-          return;
-        }
-
-        const sanitizePhoneNumber = (number) => {
-          if (number) {
-            let sanitizedNumber = number.replace(/\s+/g, '');
-            if (/^\d{10}$/.test(sanitizedNumber)) {
-              return `+91${sanitizedNumber}`;
+      .on("data", (clientData) => {
+        processingPromises.push(
+          (async () => {
+            if (!clientData.Name && !clientData.Whatsapp_Number && !clientData.Email && !clientData.Mobile_Number) {
+              return;
             }
-          }
-          return null;
-        };
 
-        Whatsapp_Number = sanitizePhoneNumber(Whatsapp_Number);
-        if (!Whatsapp_Number) {
-          results.push({
-            action: "invalid",
-            reason: "Invalid WhatsApp Number",
-            client: clientData
-          });
-          return;
-        }
+            let { Mobile_Number, Whatsapp_Number } = clientData;
+            if (!Whatsapp_Number && clientData.Name !== null) {
+              results.push({
+                action: "invalid",
+                reason: "WhatsApp Number is required",
+                client: clientData,
+              });
+              return;
+            }
 
-        if (Mobile_Number) {
-          Mobile_Number = sanitizePhoneNumber(Mobile_Number);
-          const invalidMobileNumber = !Mobile_Number;
+            const sanitizePhoneNumber = (number) => {
+              if (!number) return null;
+              let sanitizedNumber = number.replace(/\s+/g, "");
+              if (/^\+91\d{10}$/.test(sanitizedNumber)) {
+                return sanitizedNumber; // Valid +91 number
+              }
+              if (/^\d{10}$/.test(sanitizedNumber)) {
+                return `+91${sanitizedNumber}`; // Add +91 to the number
+              }
+              return null;
+            };
 
-          if (invalidMobileNumber) {
-            results.push({
-              action: "invalid",
-              reason: "Invalid Mobile Number",
-              client: clientData
+            Whatsapp_Number = sanitizePhoneNumber(Whatsapp_Number);
+            if (!Whatsapp_Number) {
+              results.push({
+                action: "invalid",
+                reason: "Invalid WhatsApp Number",
+                client: clientData,
+              });
+              return;
+            }
+
+            if (Mobile_Number) {
+              Mobile_Number = sanitizePhoneNumber(Mobile_Number);
+              const invalidMobileNumber = !Mobile_Number;
+              if (invalidMobileNumber) {
+                results.push({
+                  action: "invalid",
+                  reason: "Invalid Mobile Number",
+                  client: clientData,
+                });
+                return;
+              }
+            }
+
+            const existingClient = await CLIENT_COLLECTION.findOne({
+              whatsapp_number: Whatsapp_Number,
             });
-            return;
-          }
-        }
-        const existingClient = await CLIENT_COLLECTION.findOne({
-          whatsapp_number: Whatsapp_Number,
-        });
-        console.log("existingClient : ", existingClient);
 
-        selectedGroup = req.query.groupId;
+            const clientObj = {
+              name: clientData?.Name,
+              company_name: clientData?.Company_Name,
+              mobile_number: Mobile_Number,
+              whatsapp_number: Whatsapp_Number,
+              email: clientData?.Email,
+              city: clientData?.City,
+              district: clientData?.District,
+              address: clientData?.Address,
+              instagramID: clientData?.InstagramID,
+              facebookID: clientData?.FacebookID,
+              isFavorite: clientData?.Is_Favorite,
+              groupId: selectedGroup ? selectedGroup : clientData?.Group_ID,
+              isDeleted: false,
+            };
 
-        const clientObj = {
-          name: clientData?.Name,
-          company_name: clientData?.Company_Name,
-          mobile_number: Mobile_Number,
-          whatsapp_number: Whatsapp_Number,
-          email: clientData?.Email,
-          city: clientData?.City,
-          district: clientData?.District,
-          address: clientData?.Address,
-          instagramID: clientData?.InstagramID,
-          facebookID: clientData?.FacebookID,
-          isFavorite: clientData?.Is_Favorite,
-          groupId: selectedGroup ? selectedGroup : clientData?.Group_ID
-        };
+            const groupIds = clientObj?.groupId
+              ? clientObj?.groupId.split(",").map((id) => id.trim())
+              : [];
+            const normalizedGroupIds = groupIds.map((id) => id.padStart(3, "0"));
+            const groups = await GROUP_COLLECTION.find({ groupId: { $in: normalizedGroupIds } });
+            const groupNames = groups.map((group) => group.name).join(", ");
+            clientObj.groupName = groupNames;
 
-        const groupIds = clientObj?.groupId
-          ? clientObj?.groupId.split(',').map(id => id.trim())
-          : [];
-        const normalizedGroupIds = groupIds.map(id => id.padStart(3, '0'));
-        const groups = await GROUP_COLLECTION.find({ groupId: { $in: normalizedGroupIds } });
-        const groupNames = groups.map(group => group.name).join(', ');
-        clientObj.groupName = groupNames;
-
-        if (existingClient) {
-          const updatedClient = await CLIENT_COLLECTION.findByIdAndUpdate(
-            existingClient._id,
-            { $set: clientObj },
-            { new: true }
-          );
-          await updatedClient.save();
-          results.push({ action: "updated", client: updatedClient });
-        } else {
-          const newClient = await CLIENT_COLLECTION.create(clientObj);
-          await newClient.save();
-          results.push({ action: "inserted", client: newClient });
-        }
+            if (existingClient) {
+              const updatedClient = await CLIENT_COLLECTION.findByIdAndUpdate(
+                existingClient._id,
+                { $set: clientObj },
+                { new: true }
+              );
+              results.push({ action: "updated", client: updatedClient });
+              await updatedClient.save();
+            } else {
+              const newClient = await CLIENT_COLLECTION.create(clientObj);
+              results.push({ action: "inserted", client: newClient });
+              await newClient.save();
+            }
+          })()
+        );
       })
       .on("end", async () => {
-        const importedWhatsappNumbers = results
-          .filter(item => item.action === "inserted" || item.action === "updated")
-          .map(item => item.client.whatsapp_number);
+        await Promise.all(processingPromises);
+
+        const importedWhatsappNumbers = Array.isArray(results)
+          ? results
+            .filter((item) => item.action === "inserted" || item.action === "updated")
+            .map((item) => item.client?.whatsapp_number)
+          : [];
+
         if (selectedGroup) {
           const contactList = await CLIENT_COLLECTION.find({
             groupId: { $regex: new RegExp(`(^|,)${selectedGroup}(,|$)`) },
-            whatsapp_number: { $in: importedWhatsappNumbers }
+            whatsapp_number: { $in: importedWhatsappNumbers },
           });
-
           res.status(200).send({
-            message: "Clients imported successfully",
+            message: "Clients imported successfully in this group",
             data: contactList,
-            changes: results
+            changes: results,
           });
         } else {
           const contactList = await CLIENT_COLLECTION.find({
-            whatsapp_number: { $in: importedWhatsappNumbers }
+            whatsapp_number: { $in: importedWhatsappNumbers },
           });
           res.status(200).send({
             message: "Clients imported successfully",
             data: contactList,
-            changes: results
+            changes: results,
           });
         }
       })
       .on("error", (error) => {
-        console.error(error);
         res.status(500).send({ message: "Error importing clients", error: error.message });
       });
   } catch (error) {
@@ -1545,7 +1565,7 @@ exports.getMembersForGroup = async (req, res) => {
   } else {
     try {
       const groupId = req.body.groupId;
-      await CLIENT_COLLECTION.find({ groupId: new RegExp(`(^|,)${groupId}(,|$)`) })
+      await CLIENT_COLLECTION.find({ groupId: new RegExp(`(^|,)${groupId}(,|$)`), isDeleted: false })
         .then((clients) => {
           return res.status(200).send(clients);
         })
@@ -1559,17 +1579,5 @@ exports.getMembersForGroup = async (req, res) => {
         message: err.message || CONSTANT.MESSAGE.ERROR_OCCURRED,
       });
     }
-  }
-};
-
-exports.checkWhatsappUser = async (req, res) => {
-  const number = req.body.number;
-  try {
-    console.log("number : ", number);
-    const user = await fetch(`https://wa.me/${number}`);
-    console.log("Response: " + JSON.stringify(user));
-    res.status(200).send({ isWhatsappUser: user.json() });
-  } catch (error) {
-    res.status(500).send(error.message);
   }
 };

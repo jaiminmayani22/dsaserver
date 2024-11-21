@@ -347,6 +347,37 @@ exports.deleteTemplate = async (req, res) => {
   }
 };
 
+exports.deleteRefTemplate = async (req, res) => {
+  const errors = validationResult(req).array();
+  if (errors && errors.length > 0) {
+    let messArr = errors.map((a) => a.msg);
+    return res.status(400).send({
+      message: CONSTANT.MESSAGE.REQUIRED_FIELDS_MISSING,
+      error: messArr.join(", "),
+    });
+  } else {
+    try {
+      const { _id } = req.params;
+      const template = await TEMPLATE_REFERENCE_FORMAT_MODULE.findByIdAndUpdate(
+        _id,
+        { isDeleted: true },
+        { new: true }
+      );
+      if (!template) {
+        return res.status(404).send({ message: CONSTANT.MESSAGE.TEMPLATE_NOT_FOUND });
+      }
+      return res.status(200).json({
+        message: CONSTANT.COLLECTION.TEMPLATE + CONSTANT.MESSAGE.DELETED_SUCCESSFULLY,
+        data: _id,
+      });
+    } catch (err) {
+      return res.status(404).send({
+        message: err.message || CONSTANT.MESSAGE.ERROR_OCCURRED,
+      });
+    }
+  }
+};
+
 /*
 Method: GET
 Todo: Send Instant Message 
@@ -642,222 +673,5 @@ exports.getVariableById = (req, res) => {
       message: CONSTANT.MESSAGE.SOMETHING_WRONG,
       err: err.message,
     });
-  }
-};
-
-exports.testAPI = async (req, res) => {
-  try {
-    const folder = CONSTANT.UPLOAD_DOC_PATH.TEMPLATES_PATH; // Template upload folder
-    commonService.templateUploadFunction(
-      folder,
-      req,
-      res,
-      async (err, files) => {
-        if (err || !files || files.length <= 0) {
-          return res.status(400).send({
-            message: err?.message || CONSTANT.MESSAGE.PROFILE_NOT_UPDATE,
-          });
-        } else {
-          const { username, profilePicUrl } = req.body; // Expecting profilePicUrl and username from body
-
-          // Download the profile picture from the provided URL
-          let profileImageBuffer;
-          try {
-            if (profilePicUrl.startsWith('http')) {
-              const response = await fetch(profilePicUrl);
-              if (!response.ok) throw new Error('Failed to fetch profile picture');
-              profileImageBuffer = await response.buffer();
-            } else {
-              // Handle case where profilePicUrl is a local path
-              const profileImagePath = path.resolve(profilePicUrl);
-              if (!fs.existsSync(profileImagePath)) {
-                throw new Error('Profile image not found on local path');
-              }
-              profileImageBuffer = fs.readFileSync(profileImagePath);
-            }
-          } catch (err) {
-            console.error('Failed to load profile picture:', err.message);
-            return res.status(400).json({ error: 'Failed to load profile picture' });
-          }
-
-          // Load main image (template) that was uploaded
-          const imagePath = path.resolve(folder, files[0].filename); // Assuming the uploaded file is saved in 'folder'
-          let mainImage;
-          try {
-            mainImage = await loadImage(imagePath);
-            console.log("Main Image loaded successfully");
-          } catch (err) {
-            console.error('Failed to load main image:', err.message);
-            return res.status(400).json({ error: 'Failed to load main image' });
-          }
-
-          // Load profile image from the buffer
-          let profileImage;
-          try {
-            profileImage = await loadImage(profileImageBuffer);
-            console.log("Profile Image loaded successfully");
-          } catch (err) {
-            console.error('Failed to load profile image:', err.message);
-            return res.status(400).json({ error: 'Failed to load profile image' });
-          }
-
-          // Create a canvas with the main image dimensions
-          const canvas = createCanvas(mainImage.width, mainImage.height);
-          const ctx = canvas.getContext('2d');
-
-          // Draw the main image
-          ctx.drawImage(mainImage, 0, 0, mainImage.width, mainImage.height);
-
-          // Draw the profile image in the bottom-left corner
-          const profileSize = 100; // Define profile picture size
-          ctx.drawImage(profileImage, 10, mainImage.height - profileSize - 10, profileSize, profileSize);
-
-          // Add the username text at the bottom center
-          const fontSize = 30;
-          ctx.font = `${fontSize}px Arial`;
-          ctx.fillStyle = 'black';
-          ctx.textAlign = 'center';
-          ctx.fillText(username, mainImage.width / 2, mainImage.height - 20);
-
-          // Convert the canvas to a PNG buffer
-          const buffer = canvas.toBuffer('image/png');
-
-          // Remove the uploaded image file to clean up the server
-          fs.unlinkSync(imagePath);
-
-          // Send the processed image buffer as response
-          res.setHeader('Content-Type', 'image/png');
-          res.status(200).send(buffer);
-        }
-      }
-    );
-  } catch (err) {
-    console.error('Image processing error:', err.message);
-    res.status(500).json({ error: 'Failed to process image' });
-  }
-};
-
-// exports.processVideo = async (req, res) => {
-//   try {
-//     const { videoPath, logoPath, username } = req.body;
-//     const localVideoPath = path.join(__dirname, '../public', path.basename(videoPath));
-//     const localLogoPath = path.join(__dirname, '../public', 'profile_picture', path.basename(logoPath));
-
-//     console.log("Resolved videoPath:", localVideoPath);
-//     console.log("Resolved logoPath:", localLogoPath);
-
-//     if (!fs.existsSync(localVideoPath) || !fs.existsSync(localLogoPath)) {
-//       return res.status(400).json({ error: 'Invalid video or logo path' });
-//     }
-
-//     const outputVideoPath = path.join(__dirname, '../public', `output-${Date.now()}.mp4`);
-
-//     ffmpeg(localVideoPath)
-//       .input(localLogoPath)
-//       .complexFilter([
-//         '[0:v][1:v] overlay=x=10:y=main_h-overlay_h-10 [tmp]',  // No extra semicolon here
-//         {
-//           filter: 'drawtext',
-//           options: {
-//             fontfile: 'C:/Windows/Fonts/Arial.ttf',  // Double quotes for Windows compatibility
-//             text: `"${username}"`,  // Double quotes around username
-//             fontsize: 30,
-//             fontcolor: 'white',
-//             x: '(main_w/2-text_w/2)',
-//             y: 'main_h-30',
-//             box: 1,
-//             boxcolor: 'black@0.5',
-//             boxborderw: 5
-//           },
-//           inputs: '[tmp]',  // Chain the drawtext filter to the output of the overlay
-//           outputs: 'final'  // Define the final output
-//         }
-//       ])
-//       .outputOptions('-map', '[final]')  // Map the final output video
-//       .output(outputVideoPath)
-//       .on('end', () => {
-//         console.log('Video processing finished');
-//         res.json({ message: 'Video processed successfully', outputVideo: outputVideoPath });
-//       })
-//       .on('error', (err) => {
-//         console.error('Video processing error:', err);
-//         res.status(500).json({ error: 'Video processing failed' });
-//       })
-//       .run();
-//   } catch (err) {
-//     console.error('Video processing error:', err.message);
-//     res.status(500).json({ error: 'Failed to process video' });
-//   }
-// };
-
-exports.processVideo = async (req, res) => {
-  try {
-    const { videoPath, logoPath, username, footerText } = req.body;
-    const localVideoPath = path.join(__dirname, '../public', path.basename(videoPath));
-    const localLogoPath = path.join(__dirname, '../public', 'profile_picture', path.basename(logoPath));
-
-    console.log("Resolved videoPath:", localVideoPath);
-    console.log("Resolved logoPath:", localLogoPath);
-
-    if (!fs.existsSync(localVideoPath) || !fs.existsSync(localLogoPath)) {
-      return res.status(400).json({ error: 'Invalid video or logo path' });
-    }
-
-    const outputVideoPath = path.join(__dirname, '../public', `output-${Date.now()}.mp4`);
-
-    ffmpeg(localVideoPath)
-      .input(localLogoPath)
-      .complexFilter([
-        '[0:v][1:v] overlay=x=10:y=main_h-overlay_h-10 [videoWithLogo]',
-        'color=c=white:s=main_wx100 [whiteFooter]',
-        '[videoWithLogo][whiteFooter] vstack=inputs=2 [videoWithFooter]',
-        {
-          filter: 'drawtext',
-          options: {
-            fontfile: 'C:/Windows/Fonts/Arial.ttf',
-            text: `"${username}"`,  // Add username text on the video
-            fontsize: 30,
-            fontcolor: 'white',
-            x: '(main_w/2-text_w/2)',  // Centered horizontally
-            y: 'main_h-130',  // Positioned just above the footer
-            box: 1,
-            boxcolor: 'black@0.5',
-            boxborderw: 5
-          },
-          inputs: '[videoWithFooter]',  // Apply this on the video with the footer
-          outputs: 'videoWithUsername'
-        },
-
-        {
-          filter: 'drawtext',
-          options: {
-            fontfile: 'C:/Windows/Fonts/Arial.ttf',
-            text: `"${footerText}"`,  // Add footer text on the white footer
-            fontsize: 24,
-            fontcolor: 'black',
-            x: '(main_w/2-text_w/2)',  // Centered horizontally on the footer
-            y: 'h-line_h-10',  // Positioned near the bottom of the white footer
-            box: 1,
-            boxcolor: 'white@0.0',
-            boxborderw: 5
-          },
-          inputs: '[videoWithUsername]',  // Apply the text on the final video with username and footer
-          outputs: 'finalOutput'
-        }
-      ])
-      .outputOptions('-map', '[finalOutput]')  // Map the final video output
-      .output(outputVideoPath)
-      .on('end', () => {
-        console.log('Video processing finished');
-        res.json({ message: 'Video processed successfully', outputVideo: outputVideoPath });
-      })
-      .on('error', (err) => {
-        console.error('Video processing error:', err);
-        res.status(500).json({ error: 'Video processing failed' });
-      })
-      .run();
-  } catch (err) {
-    console.error('Video processing error:', err.message);
-    res.status(500).json({ error: 'Failed to process video' });
   }
 };
