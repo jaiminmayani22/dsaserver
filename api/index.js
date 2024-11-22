@@ -30,7 +30,7 @@ let corsOptions = {
 };
 
 mongoose.promise = global.Promise;
-// connectDB();
+connectDB();
 app.set("views", path.join(__dirname, "../views"));
 app.set("/logs", path.join(__dirname, "../logs"));
 app.use('/public', express.static(path.join(__dirname, '../public')));
