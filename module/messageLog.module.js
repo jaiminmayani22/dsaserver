@@ -7,6 +7,7 @@ const MessageLogSchema = mongoose.Schema(
     mobileNumber: { type: String, default: CONSTANT.ZERO },
     waMessageId: { type: String, default: CONSTANT.NULL_STRING },
     status: { type: String, default: CONSTANT.NULL_STRING },
+    reason: { type: String, default: CONSTANT.NULL_STRING },
     msgType: { type: String, default: CONSTANT.NULL_STRING },
     messageTitle: { type: String, default: CONSTANT.NULL_STRING },
     isDeleted: { type: Boolean, default: false },

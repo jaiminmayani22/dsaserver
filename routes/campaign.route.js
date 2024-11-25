@@ -13,4 +13,7 @@ router.post("/getCampaignById", auth, campaignCtrl.getCampaignById);
 router.delete("/deleteCampaign", auth, campaignCtrl.deleteCampaign);
 router.post("/campaignAudienceCount", auth, campaignCtrl.campaignAudienceCount);
 
+router.post("/getMessageLog", auth, campaignCtrl.getMessageLog);
+router.post("/getMessagesForCampaign", auth, campaignCtrl.getMessagesForCampaign);
+
 module.exports = router;

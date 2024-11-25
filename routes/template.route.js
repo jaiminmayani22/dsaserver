@@ -22,6 +22,7 @@ router.delete("/deleteRefTemplate/:_id", auth, templateCtrl.deleteRefTemplate);
 router.post("/createVariable", templateCtrl.createVariable)
 router.post("/getAllVariables", templateCtrl.getAllVariables)
 router.post("/getVariableById/:id", templateCtrl.getVariableById)
-router.delete("/deleteVariableById/:id", templateCtrl.deleteVariableById)
+router.delete("/deleteVariableById", templateCtrl.deleteVariableById)
+router.post("/updateVariableById/:id", templateCtrl.updateVariableById)
 
 module.exports = router;

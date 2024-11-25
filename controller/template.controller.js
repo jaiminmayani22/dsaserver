@@ -550,13 +550,13 @@ Topic: Create Variable
 */
 exports.createVariable = async (req, res) => {
   try {
-    const variable = req.body.key;
+    const variable = req.body.name;
     const extGrp = await VARIABLE_MODULE.findOne({ name: variable, isDeleted: false });
     if (extGrp) {
       return res.status(400).send({ message: CONSTANT.MESSAGE.VARIABLE_ALREADY_EXIST });
     } else {
       let groupObj = {
-        name: req.body.key,
+        name: req.body.name,
       };
       VARIABLE_MODULE.create(groupObj)
         .then((result) => {
@@ -600,7 +600,48 @@ exports.getAllVariables = async (req, res) => {
 TODO: DELETE
 Topic: delete Variable by id
 */
-exports.deleteVariableById = (req, res) => {
+exports.deleteVariableById = async (req, res) => {
+  const { ids } = req.body;
+  try {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({
+        message: 'Invalid request. IDs must be a non-empty array.',
+      });
+    }
+
+    for (const id of ids) {
+      if (!commonService.isValidObjId(id)) {
+        return res.status(403).json({
+          message: `Invalid ID: ${id}`,
+        });
+      }
+    }
+
+    const updateResults = await VARIABLE_MODULE.updateMany(
+      { _id: { $in: ids }, isDeleted: false },
+      { $set: { isDeleted: true } }
+    );
+
+    if (updateResults.matchedCount === 0) {
+      return res.status(404).json({
+        message: 'No variables found to delete.',
+      });
+    }
+
+    return res.status(200).json({
+      message: `${updateResults.modifiedCount} variables deleted successfully.`,
+      deletedIds: ids,
+    });
+  } catch (err) {
+    console.error('Error deleting variables:', err);
+    res.status(500).json({
+      message: 'Something went wrong.',
+      error: err.message,
+    });
+  }
+};
+
+exports.updateVariableById = (req, res) => {
   const Id = req.params.id;
   try {
     if (!commonService.isValidObjId(Id)) {
@@ -608,23 +649,24 @@ exports.deleteVariableById = (req, res) => {
         message: CONSTANT.MESSAGE.INVALID_ID,
       });
     } else {
-      VARIABLE_MODULE.findOne({ _id: Id, isDeleted: false }).then((group) => {
-        if (!group) {
+      VARIABLE_MODULE.findOne({ _id: Id, isDeleted: false }).then((variable) => {
+        if (!variable) {
           return res.status(403).send({
             message: CONSTANT.MESSAGE.VARIABLE_NOT_FOUND,
           });
         } else {
+          const { ...updatedFields } = req.body;
           VARIABLE_MODULE.findByIdAndUpdate(
             Id,
-            { $set: { isDeleted: true } },
+            { ...updatedFields },
             { new: true }
           )
             .then(async (data) => {
               res.status(200).json({
-                data: Id,
+                data: data,
                 message:
                   CONSTANT.COLLECTION.VARIABLE +
-                  CONSTANT.MESSAGE.DELETED_SUCCESSFULLY,
+                  CONSTANT.MESSAGE.UPDATED_SUCCESSFULLY,
               });
             })
             .catch((err) => {

@@ -67,7 +67,7 @@ exports.createCampaignMarketing = async (req, res, folder) => {
 
         switch (data.audience) {
           case "allContacts":
-            const allClients = await CLIENT_MODULE.find({}, { _id: 1 });
+            const allClients = await CLIENT_MODULE.find({ isDeleted: false }, { _id: 1 });
             count = allClients.length;
             clientIds = allClients.map(client => client._id);
             break;
@@ -76,14 +76,14 @@ exports.createCampaignMarketing = async (req, res, folder) => {
             const groupArray = obj.groups.split(',').map(groupId => groupId.trim());
             const groupRegex = new RegExp(groupArray.map(groupId => `(^|,)${groupId}(,|$)`).join('|'));
 
-            const groupClients = await CLIENT_MODULE.find({ groupId: groupRegex }, { _id: 1 });
+            const groupClients = await CLIENT_MODULE.find({ groupId: groupRegex, isDeleted: false }, { _id: 1 });
             count = groupClients.length;
             clientIds = groupClients.map(client => client._id);
             data.groups = obj.groups;
             break;
 
           case "favoriteContacts":
-            const favoriteClients = await CLIENT_MODULE.find({ isFavorite: 'yes' }, { _id: 1 });
+            const favoriteClients = await CLIENT_MODULE.find({ isFavorite: 'yes', isDeleted: false }, { _id: 1 });
             count = favoriteClients.length;
             clientIds = favoriteClients.map(client => client._id);
             break;
@@ -185,7 +185,7 @@ exports.createCampaignUtility = async (req, res, folder) => {
 
         switch (data.audience) {
           case "allContacts":
-            const allClients = await CLIENT_MODULE.find({}, { _id: 1 });
+            const allClients = await CLIENT_MODULE.find({ isDeleted: false }, { _id: 1 });
             count = allClients.length;
             clientIds = allClients.map(client => client._id);
             break;
@@ -194,14 +194,14 @@ exports.createCampaignUtility = async (req, res, folder) => {
             const groupArray = obj.groups.split(',').map(groupId => groupId.trim());
             const groupRegex = new RegExp(groupArray.map(groupId => `(^|,)${groupId}(,|$)`).join('|'));
 
-            const groupClients = await CLIENT_MODULE.find({ groupId: groupRegex }, { _id: 1 });
+            const groupClients = await CLIENT_MODULE.find({ groupId: groupRegex, isDeleted: false }, { _id: 1 });
             count = groupClients.length;
             clientIds = groupClients.map(client => client._id);
             data.groups = obj.groups;
             break;
 
           case "favoriteContacts":
-            const favoriteClients = await CLIENT_MODULE.find({ isFavorite: 'yes' }, { _id: 1 });
+            const favoriteClients = await CLIENT_MODULE.find({ isFavorite: 'yes', isDeleted: false }, { _id: 1 });
             count = favoriteClients.length;
             clientIds = favoriteClients.map(client => client._id);
             break;
@@ -262,12 +262,12 @@ exports.duplicateCampaign = async (req, res) => {
       return res.status(404).json({ message: "Original campaign not found" });
     }
 
-    const existCampaign = await CAMPAIGN_MODULE.find({ name: name });
+    const existCampaign = await CAMPAIGN_MODULE.find({ name: name, isDeleted: false });
     if (!existCampaign) {
       return res.status(403).json({ message: `Campaign With name "${name}" already Exist ! Please Use Different Name.` });
     }
 
-    const { createdAt, updatedAt, _id, ...rest } = originalCampaign.toObject();
+    const { createdAt, updatedAt, _id, status, receiver, overallHealth, phonenumberHealth, wabaHealth, businessHealth, ...rest } = originalCampaign.toObject();
     const duplicateData = { ...rest, name };
     const newCampaign = await CAMPAIGN_MODULE.create(duplicateData);
 
@@ -363,19 +363,19 @@ exports.campaignAudienceCount = async (req, res) => {
 
     switch (audience) {
       case "allContacts":
-        const allClients = await CLIENT_MODULE.find({}, { _id: 1 });
+        const allClients = await CLIENT_MODULE.find({ isDeleted: false }, { _id: 1 });
         count = allClients.length;
         break;
 
       case "group":
         const groupArray = groups.split(',').map(groupId => groupId.trim());
         const groupRegex = new RegExp(groupArray.map(groupId => `(^|,)${groupId}(,|$)`).join('|'));
-        const groupClients = await CLIENT_MODULE.find({ groupId: groupRegex }, { _id: 1 });
+        const groupClients = await CLIENT_MODULE.find({ groupId: groupRegex, isDeleted: false }, { _id: 1 });
         count = groupClients.length;
         break;
 
       case "favoriteContacts":
-        const favoriteClients = await CLIENT_MODULE.find({ isFavorite: 'yes' }, { _id: 1 });
+        const favoriteClients = await CLIENT_MODULE.find({ isFavorite: 'yes', isDeleted: false }, { _id: 1 });
         count = favoriteClients.length;
         break;
 
@@ -529,6 +529,7 @@ exports.getMessageLog = async (req, res) => {
           $group: {
             _id: {
               msgType: "$msgType",
+              name: "$name",
               messageTitle: "$messageTitle",
             },
             Total_Contacts: { $sum: 1 },
@@ -542,15 +543,15 @@ exports.getMessageLog = async (req, res) => {
         },
         {
           $sort: {
-            createdAt: -1, // Sort by date in descending order
+            createdAt: -1,
           },
         },
       ]);
 
-      // Transform the results into the required structure
       const result = logs.map((log) => ({
         Campaigns: log._id.msgType,
-        Title: log._id.messageTitle,
+        Title: log._id.name,
+        Message: log._id.messageTitle,
         Total_Contacts: log.Total_Contacts,
         Date: log._id.date,
         scheduled: log.scheduled,
@@ -862,8 +863,12 @@ const editUtilityImage = async ({
     }
 
     const sanitizedNumber = number.replace('+', '');
-    const tempImagePath = path.join(CONSTANT.UPLOAD_DOC_PATH.SCHEDULE_UTILITY_EDITED, `${_id}_${sanitizedNumber}.jpeg`);
-    const buffer = canvas.toBuffer('image/jpeg');
+    const uploadPath = path.resolve(__dirname, CONSTANT.UPLOAD_DOC_PATH.SCHEDULE_UTILITY_EDITED);
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }    
+    const tempImagePath = path.join(uploadPath, `${_id}_${sanitizedNumber}.jpeg`);
+        const buffer = canvas.toBuffer('image/jpeg');
     if (buffer.length === 0) {
       throw new Error('The buffer is empty, cannot write to file.');
     }
@@ -924,14 +929,6 @@ const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, 
     };
 
     await whatsappAPISend(messageData, _id, messageType, caption);
-
-    // fs.unlink(absoluteTempImagePath, (err) => {
-    //   if (err) {
-    //     console.error(`Error deleting file: ${absoluteTempImagePath}`, err);
-    //   } else {
-    //     console.log(`Successfully deleted file: ${absoluteTempImagePath}`);
-    //   }
-    // });
   }
   await updateCampaignStatus(_id, 'completed');
 };
@@ -966,5 +963,67 @@ const whatsappAPISend = async (messageData, _id, messageType, caption) => {
       });
   } catch (error) {
     return console.error(`Failed to send message to ${mobileNumber}:`, error);
+  }
+};
+
+exports.getMessagesForCampaign = async (req, res) => {
+  try {
+    const { _id: campaignId } = req.body;
+
+    if (!campaignId) {
+      return res.status(400).json({
+        message: CONSTANT.MESSAGE.REQUIRED_FIELDS_MISSING,
+        errors: ["Campaign ID is required"],
+      });
+    }
+
+    const logs = await MESSAGE_LOG.aggregate([
+      {
+        $match: { camId: campaignId },
+      },
+      {
+        $lookup: {
+          from: "clients",
+          localField: "mobileNumber",
+          foreignField: "whatsapp_number",
+          as: "clientInfo", // Resulting array will be stored in this field
+        },
+      },
+      {
+        $unwind: {
+          path: "$clientInfo",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      {
+        $match: {
+          "clientInfo.isDeleted": false,
+        },
+      },
+      {
+        $project: {
+          _id: 1,
+          camId: 1,
+          mobileNumber: 1,
+          waMessageId: 1,
+          status: 1,
+          msgType: 1,
+          messageTitle: 1,
+          isDeleted: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          clientName: "$clientInfo.name",
+        },
+      },
+    ]);
+
+    return res.status(200).json({
+      message: CONSTANT.MESSAGE.DATA_FOUND_SUCCESSFULLY,
+      data: logs,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: error.message || CONSTANT.MESSAGE.ERROR_OCCURRED,
+    });
   }
 };
