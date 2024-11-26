@@ -100,8 +100,18 @@ async function updateWhatsappStatuses(data) {
                                 updatedAt: new Date()
                             },
                             { returnDocument: "after" }
-                        ).then((updatedData) => {
-                            if (updatedData && (status.status === "read" || status.status === "failed")) {
+                        ).then(async (updatedData) => {
+                            if (updatedData && (status.status === "read" || status.status === "accepted")) {
+                                await CAMPAIGN_MODULE.findOneAndUpdate(
+                                    { _id: updatedData.camId },
+                                    {
+                                        $inc: { receiver: 1 },
+                                        updatedAt: new Date()
+                                    },
+                                    { returnDocument: "after" }
+                                );
+                            }
+                            if (updatedData && (status.status === "read" || status.status === "failed" || status.status === "accepted")) {
                                 const { camId, mobileNumber } = updatedData;
                                 const sanitizedNumber = mobileNumber.replace('+', '');
                                 const tempImagePath = path.join(

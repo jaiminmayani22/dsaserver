@@ -866,9 +866,9 @@ const editUtilityImage = async ({
     const uploadPath = path.resolve(__dirname, CONSTANT.UPLOAD_DOC_PATH.SCHEDULE_UTILITY_EDITED);
     if (!fs.existsSync(uploadPath)) {
       fs.mkdirSync(uploadPath, { recursive: true });
-    }    
+    }
     const tempImagePath = path.join(uploadPath, `${_id}_${sanitizedNumber}.jpeg`);
-        const buffer = canvas.toBuffer('image/jpeg');
+    const buffer = canvas.toBuffer('image/jpeg');
     if (buffer.length === 0) {
       throw new Error('The buffer is empty, cannot write to file.');
     }
