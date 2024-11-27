@@ -863,7 +863,7 @@ const editUtilityImage = async ({
     }
 
     const sanitizedNumber = number.replace('+', '');
-    const uploadPath = path.resolve(__dirname, CONSTANT.UPLOAD_DOC_PATH.SCHEDULE_UTILITY_EDITED);
+    const uploadPath = path.resolve(__dirname, '..', CONSTANT.UPLOAD_DOC_PATH.SCHEDULE_UTILITY_EDITED);
     if (!fs.existsSync(uploadPath)) {
       fs.mkdirSync(uploadPath, { recursive: true });
     }
@@ -907,6 +907,7 @@ const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, 
     });
     const absoluteTempImagePath = path.resolve(tempImagePath);
     const imageUrl = `${process.env.BACKEND_URL}` + CONSTANT.UPLOAD_DOC_PATH.SCHEDULE_UTILITY_EDITED + "/" + `${path.basename(absoluteTempImagePath)}`;
+
     const messageData = {
       messaging_product: "whatsapp",
       recepient_type: "individual",

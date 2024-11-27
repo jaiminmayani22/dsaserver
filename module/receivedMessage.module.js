@@ -3,9 +3,10 @@ const CONSTANT = require("../common/constant");
 
 const ReceivedMessageSchema = mongoose.Schema(
   {
-    from: { type: Number , default: CONSTANT.ZERO },
+    from: { type: String , default: CONSTANT.NULL_STRING },
     fromName: { type: String, default: CONSTANT.NULL_STRING },
     message: { type: String, default: CONSTANT.NULL_STRING },
+    ticketNumber: { type: String, default: CONSTANT.NULL_STRING },
     isDeleted: { type: Boolean, default: false },
   },
   {

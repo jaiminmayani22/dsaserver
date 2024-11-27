@@ -365,7 +365,7 @@ exports.createClient = async (req, res) => {
         const { name, _ } = commonService.getUserIdFromToken(req);
         let obj = { ...req.body };
 
-        const whatsappNum = `+91${obj.whatsapp_number}`;
+        const whatsappNum = formatNumber(obj.whatsapp_number);
         const extUser = await CLIENT_COLLECTION.findOne({ whatsapp_number: whatsappNum, isDeleted: false });
         if (extUser) {
           return res.status(401).send({ message: CONSTANT.MESSAGE.USER_EXIST, data: extUser });
@@ -392,7 +392,7 @@ exports.createClient = async (req, res) => {
         let clientObj = {
           name: obj.name || "",
           company_name: obj.company_name || "",
-          mobile_number: obj.mobile_number ? `+91${obj.mobile_number}` : "",
+          mobile_number: obj.mobile_number ? formatNumber(obj.mobile_number) : "",
           whatsapp_number: whatsappNum,
           email: obj.email || "",
           city: obj.city || "",
@@ -431,6 +431,16 @@ exports.createClient = async (req, res) => {
       });
     }
   }
+};
+
+const formatNumber = (number) => {
+  if (number) {
+    if (number.startsWith("+91")) {
+      return number;
+    }
+    return `+91${number}`;
+  }
+  return;
 };
 
 /*
@@ -751,7 +761,8 @@ exports.updateClientById = async (req, res) => {
       const groups = await GROUP_COLLECTION.find({ groupId: { $in: normalizedGroupIds } });
       const groupNames = groups.map(group => group.name).join(', ');
       updatedFields.groupName = groupNames;
-
+      updatedFields.whatsapp_number = formatNumber(updatedFields.whatsapp_number);
+      updatedFields.mobile_number = formatNumber(updatedFields.mobile_number);
       const result = await CLIENT_COLLECTION.findByIdAndUpdate(
         Id,
         { ...updatedFields },
@@ -1190,7 +1201,7 @@ exports.importClientFromCSV = async (req, res) => {
             if (!Whatsapp_Number && clientData.Name !== null) {
               results.push({
                 action: "invalid",
-                reason: "WhatsApp Number is required",
+                reason: "WhatsApp Number is required, Please Add Whatsapp Number",
                 client: clientData,
               });
               return;
@@ -1200,10 +1211,10 @@ exports.importClientFromCSV = async (req, res) => {
               if (!number) return null;
               let sanitizedNumber = number.replace(/\s+/g, "");
               if (/^\+91\d{10}$/.test(sanitizedNumber)) {
-                return sanitizedNumber; // Valid +91 number
+                return sanitizedNumber;
               }
               if (/^\d{10}$/.test(sanitizedNumber)) {
-                return `+91${sanitizedNumber}`; // Add +91 to the number
+                return `+91${sanitizedNumber}`;
               }
               return null;
             };
@@ -1212,7 +1223,7 @@ exports.importClientFromCSV = async (req, res) => {
             if (!Whatsapp_Number) {
               results.push({
                 action: "invalid",
-                reason: "Invalid WhatsApp Number",
+                reason: "Invalid WhatsApp Number, it should be 10 Digits",
                 client: clientData,
               });
               return;
@@ -1224,7 +1235,7 @@ exports.importClientFromCSV = async (req, res) => {
               if (invalidMobileNumber) {
                 results.push({
                   action: "invalid",
-                  reason: "Invalid Mobile Number",
+                  reason: "Invalid Mobile Number, it should be 10 Digits",
                   client: clientData,
                 });
                 return;

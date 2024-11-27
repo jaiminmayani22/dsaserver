@@ -69,11 +69,19 @@ async function sendWhatsappTextMessage(to, message) {
                     ],
                 },
             })
-        }).then(response => {
+        }).then(async (response) => {
+            const data = await response.json();
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            return response.json();
+
+            const obj = {
+                mobileNumber: data.contacts[0].input,
+                waMessageId: data.messages[0].id,
+                status: data.messages[0].message_status,
+                messageTitle: message
+            };
+            await MESSAGE_LOG.create(obj);
         }).catch(err => {
             console.error(CONSTANT.MESSAGE.MESSAGE_NOT_SEND);
             throw err;
@@ -114,7 +122,8 @@ async function updateWhatsappStatuses(data) {
                             if (updatedData && (status.status === "read" || status.status === "failed" || status.status === "accepted")) {
                                 const { camId, mobileNumber } = updatedData;
                                 const sanitizedNumber = mobileNumber.replace('+', '');
-                                const tempImagePath = path.join(
+                                const tempImagePath = path.resolve(
+                                    __dirname,
                                     CONSTANT.UPLOAD_DOC_PATH.SCHEDULE_UTILITY_EDITED,
                                     `${camId}_${sanitizedNumber}.jpeg`
                                 );
@@ -142,14 +151,28 @@ async function processWhatsappMessages(data) {
     try {
         const receivedMessages = await getAllWhatsappMessages(data);
         for (const msg of receivedMessages) {
-            const newReceivedMessage = new RECEIVED_MESSAGE({
-                from: msg.from,
-                fromName: msg.fromName,
-                message: msg.message
-            });
-
+            const generateTicketNumber = () => {
+                return Math.floor(Math.random() * 9000000000) + 1000000000;
+            };
+            let newReceivedMessage;
+            const existingTicket = await RECEIVED_MESSAGE.findOne({ from: msg.from });
+            if (existingTicket && existingTicket.ticketNumber) {
+                newReceivedMessage = new RECEIVED_MESSAGE({
+                    from: msg.from,
+                    fromName: msg.fromName,
+                    message: msg.message,
+                    ticketNumber: existingTicket.ticketNumber,
+                });
+            } else {
+                newReceivedMessage = new RECEIVED_MESSAGE({
+                    from: msg.from,
+                    fromName: msg.fromName,
+                    message: msg.message,
+                    ticketNumber: generateTicketNumber(),
+                });
+            }
             await newReceivedMessage.save();
-            const responseMessage = "Hello! Thank you for reaching out. Call us at 9727427410 for more information!";
+            const responseMessage = "Hello! Thank you for reaching out. Call us at 8758997422 for more information!";
             await sendWhatsappTextMessage(msg.from, responseMessage);
         }
     } catch (error) {
