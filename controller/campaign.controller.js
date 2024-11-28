@@ -224,6 +224,24 @@ exports.createCampaignUtility = async (req, res, folder) => {
             clientIds = favoriteClients.map(client => client._id);
             break;
 
+          case "quickAudience":
+            const contactArray = obj.quickAudience.split(',').map(contact => contact.trim());
+            const numberRegex = new RegExp(
+              contactArray.map(number => `(^|,)\\${number}(,|$)`).join('|')
+            );
+
+            const contacts = await CLIENT_MODULE.find(
+              {
+                whatsapp_number: { $regex: numberRegex, $options: 'i' }, // Case-insensitive match
+                isDeleted: false,
+              },
+              { _id: 1 }
+            );
+
+            count = contacts.length;
+            clientIds = contacts.map(client => client._id);
+            break;
+
           default:
             break;
         }
@@ -858,7 +876,7 @@ const editUtilityImage = async ({
               continue;
             };
           } else {
-            updatedContent = updatedContent.replace(/LOGO/i, '');
+            updatedContent = updatedContent.replace(/logo/i, '');
           }
         }
 

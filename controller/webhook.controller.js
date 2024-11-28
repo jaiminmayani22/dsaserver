@@ -104,7 +104,7 @@ async function updateWhatsappStatuses(data) {
                             { waMessageId: status.id },
                             {
                                 status: status.status,
-                                reason: status.errors[0]?.title,
+                                reason: status.errors[0]?.error_data.details,
                                 updatedAt: new Date()
                             },
                             { returnDocument: "after" }
