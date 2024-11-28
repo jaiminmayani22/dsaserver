@@ -88,6 +88,24 @@ exports.createCampaignMarketing = async (req, res, folder) => {
             clientIds = favoriteClients.map(client => client._id);
             break;
 
+          case "quickAudience":
+            const contactArray = obj.quickAudience.split(',').map(contact => contact.trim());
+            const numberRegex = new RegExp(
+              contactArray.map(number => `(^|,)\\${number}(,|$)`).join('|')
+            );
+
+            const contacts = await CLIENT_MODULE.find(
+              {
+                whatsapp_number: { $regex: numberRegex, $options: 'i' }, // Case-insensitive match
+                isDeleted: false,
+              },
+              { _id: 1 }
+            );
+
+            count = contacts.length;
+            clientIds = contacts.map(client => client._id);
+            break;
+
           default:
             break;
         }
@@ -797,11 +815,14 @@ const editUtilityImage = async ({
         if (/facebookId/i.test(content)) {
           updatedContent = updatedContent.replace(/facebookId/i, facebookID ? facebookID : '');
         }
-        if (/companyName/i.test(content)) {
-          updatedContent = updatedContent.replace(/companyName/i, company_name ? company_name : '');
+        if (/company_name/i.test(content)) {
+          updatedContent = updatedContent.replace(/company_name/i, company_name ? company_name : '');
         }
         if (/email/i.test(content)) {
           updatedContent = updatedContent.replace(/email/i, email ? email : '');
+        }
+        if (/city/i.test(content)) {
+          updatedContent = updatedContent.replace(/city/i, city ? city : '');
         }
         if (/Website/i.test(content)) {
           updatedContent = updatedContent.replace(/Website/i, userWebsite ? userWebsite : '');

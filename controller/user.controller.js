@@ -395,6 +395,7 @@ exports.createClient = async (req, res) => {
           mobile_number: obj.mobile_number ? formatNumber(obj.mobile_number) : "",
           whatsapp_number: whatsappNum,
           email: obj.email || "",
+          website: obj.website || "",
           city: obj.city || "",
           district: obj.district || "",
           address: obj.address || "",
