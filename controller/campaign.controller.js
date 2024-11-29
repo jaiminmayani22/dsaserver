@@ -744,7 +744,7 @@ const sendMarketingWhatsAppMessages = async (mobileNumbers, images, _id, caption
 
     await whatsappAPISend(messageData, _id, messageType, caption);
   }
-  await updateCampaignStatus(_id, 'completed');
+  await updateCampaignStatus(_id, "completed");
 };
 
 const sendTextWhatsAppMessages = async (mobileNumbers, _id, caption, messageType) => {
@@ -767,7 +767,7 @@ const sendTextWhatsAppMessages = async (mobileNumbers, _id, caption, messageType
 
     await whatsappAPISend(messageData, _id, messageType, caption);
   }
-  await updateCampaignStatus(_id, 'completed');
+  await updateCampaignStatus(_id, "completed");
 };
 
 const editUtilityImage = async ({
@@ -841,6 +841,12 @@ const editUtilityImage = async ({
         }
         if (/city/i.test(content)) {
           updatedContent = updatedContent.replace(/city/i, city ? city : '');
+        }
+        if (/district/i.test(content)) {
+          updatedContent = updatedContent.replace(/district/i, district ? district : '');
+        }
+        if (/address/i.test(content)) {
+          updatedContent = updatedContent.replace(/address/i, address ? address : '');
         }
         if (/Website/i.test(content)) {
           updatedContent = updatedContent.replace(/Website/i, userWebsite ? userWebsite : '');
@@ -970,7 +976,7 @@ const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, 
 
     await whatsappAPISend(messageData, _id, messageType, caption);
   }
-  await updateCampaignStatus(_id, 'completed');
+  await updateCampaignStatus(_id, "completed");
 };
 
 const whatsappAPISend = async (messageData, _id, messageType, caption) => {
@@ -985,9 +991,6 @@ const whatsappAPISend = async (messageData, _id, messageType, caption) => {
     })
       .then(async (response) => {
         const data = await response.json();
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
 
         const obj = {
           camId: _id,

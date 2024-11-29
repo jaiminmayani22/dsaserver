@@ -100,7 +100,7 @@ async function updateWhatsappStatuses(data) {
                 const value = change.value;
                 if (value.statuses) {
                     for (const status of value.statuses) {
-                        const reason = status.errors?.[0]?.error_data?.details || status.errors?.[0]?.message || "Unknown error";
+                        const reason = status.errors?.[0]?.error_data?.details || status.errors?.[0]?.message || "";
                         await MESSAGE_LOG.findOneAndUpdate(
                             { waMessageId: status.id },
                             {
