@@ -1047,6 +1047,7 @@ exports.getMessagesForCampaign = async (req, res) => {
           mobileNumber: 1,
           waMessageId: 1,
           status: 1,
+          reason: 1,
           msgType: 1,
           messageTitle: 1,
           isDeleted: 1,
