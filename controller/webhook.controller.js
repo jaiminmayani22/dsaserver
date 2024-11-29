@@ -106,28 +106,41 @@ async function updateWhatsappStatuses(data) {
                             {
                                 status: status.status,
                                 reason: reason,
-                                updatedAt: new Date()
+                                updatedAt: new Date(),
                             },
                             { returnDocument: "after" }
                         ).then(async (updatedData) => {
-                            if (updatedData && (status.status === "read" || status.status === "accepted")) {
-                                await CAMPAIGN_MODULE.findOneAndUpdate(
+                            if (!updatedData) {
+                                console.error(`No MESSAGE_LOG entry found for waMessageId: ${status.id}`);
+                                return;
+                            }
+
+                            if (status.status === "read" || status.status === "accepted") {
+                                const campaignUpdate = await CAMPAIGN_MODULE.findOneAndUpdate(
                                     { _id: updatedData.camId },
                                     {
                                         $inc: { receiver: 1 },
-                                        updatedAt: new Date()
+                                        updatedAt: new Date(),
                                     },
                                     { returnDocument: "after" }
                                 );
+
+                                if (!campaignUpdate) {
+                                    console.error(`Failed to update CAMPAIGN_MODULE for camId: ${updatedData.camId}`);
+                                } else {
+                                    console.log("Updated CAMPAIGN_MODULE entry: ", campaignUpdate.receiver);
+                                }
                             }
-                            if (updatedData && (status.status === "read" || status.status === "failed" || status.status === "accepted")) {
+
+                            if (status.status === "read" || status.status === "failed" || status.status === "accepted") {
                                 const { camId, mobileNumber } = updatedData;
                                 const sanitizedNumber = mobileNumber.replace('+', '');
                                 const tempImagePath = path.resolve(
-                                    __dirname,
+                                    __dirname, "..",
                                     CONSTANT.UPLOAD_DOC_PATH.SCHEDULE_UTILITY_EDITED,
                                     `${camId}_${sanitizedNumber}.jpeg`
                                 );
+
                                 fs.unlink(tempImagePath, (err) => {
                                     if (err) {
                                         console.error(`Failed to delete image: ${tempImagePath}`, err);
@@ -136,6 +149,8 @@ async function updateWhatsappStatuses(data) {
                                     }
                                 });
                             }
+                        }).catch((error) => {
+                            console.error("Error updating MESSAGE_LOG:", error);
                         });
                     }
                 }
