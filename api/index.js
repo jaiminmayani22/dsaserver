@@ -33,7 +33,16 @@ mongoose.promise = global.Promise;
 connectDB();
 app.set("views", path.join(__dirname, "../views"));
 app.set("/logs", path.join(__dirname, "../logs"));
-app.use('/public', express.static(path.join(__dirname, '../public')));
+app.use(
+  '/public',
+  express.static(path.join(__dirname, '../public'), {
+    setHeaders: (res, path) => {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    },
+  })
+);
 app.use('./public', express.static(path.join(__dirname, '../public')));
 app.use(express.static("./document"));
 app.use(express.static("../views"));
