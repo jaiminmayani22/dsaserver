@@ -999,10 +999,10 @@ const whatsappAPISend = async (messageData, _id, messageType, caption) => {
         };
         await MESSAGE_LOG.create(obj);
       }).catch((error) => {
-        return console.error(error.message);
+        console.error(error.message);
       });
   } catch (error) {
-    return console.error(`Failed to send message to ${mobileNumber}:`, error);
+    console.error(`Failed to send message to ${mobileNumber}:`, error);
   }
 };
 
