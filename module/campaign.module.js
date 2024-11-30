@@ -10,6 +10,7 @@ const CampaignSchema = mongoose.Schema(
         receiver: { type: String, default: CONSTANT.NULL_STRING },
         audience: { type: String, default: CONSTANT.NULL_STRING },
         audienceIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'client' }],
+        freezedAudienceIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'client' }],
         groups: { type: String, default: CONSTANT.NULL_STRING },
         countAudience: { type: Number, default: 0 },
         caption: { type: String, default: CONSTANT.NULL_STRING },

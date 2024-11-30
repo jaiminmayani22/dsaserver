@@ -147,7 +147,7 @@ module.exports = Object.freeze({
     ACTIVE_SUCCESSFULLY: "active successfully!",
     ADDED_SUCCESSFULLY: "added successfully!",
     CREATE_SUCCESSFULLY: "created successfully!",
-    CREATE_SENT_SUCCESSFULLY: "created & Sent successfully!",
+    CREATE_SENT_SUCCESSFULLY: "Sent successfully!",
     FOUND_SUCCESSFULLY: "found successfully!",
     CANCEL_SUCCESSFULLY: "cancel successfully!",
     ROLE_ADDED_SUCCESSFULLY: "Access for role has settled successfully!",

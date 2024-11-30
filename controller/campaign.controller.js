@@ -470,6 +470,11 @@ exports.getCampaignById = async (req, res) => {
           select: 'whatsapp_number name'
         })
         .populate({
+          path: 'freezedAudienceIds',
+          model: 'clients',
+          select: 'whatsapp_number name'
+        })
+        .populate({
           path: 'selectedRefTemplate',
           model: 'templateReferenceFormat',
         })
@@ -609,15 +614,41 @@ exports.getMessageLog = async (req, res) => {
 
 // FUNCTIONS FOR WHATSAPP MESSAGE
 const sendInstantMessage = async (req, res) => {
-  const { _id, caption, messageType, document, audienceIds, documentType } = req.body;
+  const { _id, caption, messageType, document, audienceIds, documentType, freezedAudienceIds, freezedSend } = req.body;
 
   const mobileNumbers = [];
-  const clients = await CLIENT_MODULE.find({ _id: { $in: audienceIds } });
-  clients.forEach(client => {
+  let freezedAudience = [];
+  const oneHourAgo = Date.now() - 3600000;
+  let clients;
+  if (freezedSend && freezedSend === 'yes') {
+    clients = await CLIENT_MODULE.find({ _id: { $in: freezedAudienceIds }, isDeleted: false });
+  } else {
+    clients = await CLIENT_MODULE.find({ _id: { $in: audienceIds }, isDeleted: false });
+  }
+
+  for (const client of clients) {
     if (client.whatsapp_number) {
-      mobileNumbers.push(client.whatsapp_number);
+      const latestLog = await MESSAGE_LOG.findOne({ mobileNumber: client.whatsapp_number, isDeleted: false })
+        .sort({ updatedAt: -1 });
+
+      if (latestLog) {
+        if (latestLog.updatedAt.getTime() > oneHourAgo &&
+          latestLog.status !== 'read' &&
+          latestLog.status !== 'sent' &&
+          latestLog.status !== 'delivered') {
+          freezedAudience.push(client._id);
+        } else {
+          mobileNumbers.push(client.whatsapp_number);
+        }
+      }
     }
-  });
+  }
+
+  if (freezedAudienceIds.length > 0) {
+    await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { freezedAudienceIds: freezedAudience });
+  } else {
+    await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { freezedAudienceIds: [] });
+  }
 
   const imageUrl = document.url;
   if (messageType === 'marketing' && imageUrl) {
