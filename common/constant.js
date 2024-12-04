@@ -497,6 +497,7 @@ module.exports = Object.freeze({
 
   TEMPLATE_NAME: {
     FOR_IMAGE: "schedule_msg_wt_custom",
+    FOR_UTILITY: "schedule_msg_wt_custom_new",
     FOR_VIDEO: "schedule_msg_wt_vdo",
     FOR_DOCUMENT: "schedule_msg_wt_doc",
     FOR_ONLY_TEXT: "wt_only_text"

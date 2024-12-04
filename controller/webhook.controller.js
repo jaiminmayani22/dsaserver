@@ -100,39 +100,38 @@ async function updateWhatsappStatuses(data) {
                 const value = change.value;
                 if (value.statuses) {
                     for (const status of value.statuses) {
-                        const reason = status.errors?.[0]?.error_data?.details || status.errors?.[0]?.message || "";
-                        await MESSAGE_LOG.findOneAndUpdate(
-                            { waMessageId: status.id },
-                            {
-                                status: status.status,
-                                reason: reason,
-                                updatedAt: new Date(),
-                            },
-                            { returnDocument: "after" }
-                        ).then(async (updatedData) => {
+                        try {
+                            const reason = status.errors?.[0]?.error_data?.details || status.errors?.[0]?.message || "";
+                            const updatedData = await MESSAGE_LOG.findOneAndUpdate(
+                                { waMessageId: status.id },
+                                {
+                                    status: status.status,
+                                    reason: reason,
+                                    updatedAt: new Date(),
+                                },
+                                { returnDocument: "after" }
+                            );
+
                             if (!updatedData) {
                                 console.error(`No MESSAGE_LOG entry found for waMessageId: ${status.id}`);
-                                return;
+                                continue;
                             }
 
-                            if (status.status === "read" || status.status === "accepted") {
+                            if (["read", "accepted", "sent"].includes(status.status)) {
                                 const campaignUpdate = await CAMPAIGN_MODULE.findOneAndUpdate(
                                     { _id: updatedData.camId },
-                                    {
-                                        $inc: { receiver: 1 },
-                                        updatedAt: new Date(),
-                                    },
+                                    { $inc: { receiver: 1 } },
                                     { returnDocument: "after" }
                                 );
 
                                 if (!campaignUpdate) {
                                     console.error(`Failed to update CAMPAIGN_MODULE for camId: ${updatedData.camId}`);
                                 } else {
-                                    console.log("Updated CAMPAIGN_MODULE entry: ", campaignUpdate.receiver);
+                                    console.log(`Updated CAMPAIGN_MODULE receiver:`, campaignUpdate.receiver);
                                 }
                             }
 
-                            if (status.status === "read" || status.status === "failed" || status.status === "accepted") {
+                            if (["read", "failed", "accepted"].includes(status.status)) {
                                 const { camId, mobileNumber } = updatedData;
                                 const sanitizedNumber = mobileNumber.replace('+', '');
                                 const tempImagePath = path.resolve(
@@ -141,17 +140,21 @@ async function updateWhatsappStatuses(data) {
                                     `${camId}_${sanitizedNumber}.jpeg`
                                 );
 
-                                fs.unlink(tempImagePath, (err) => {
-                                    if (err) {
-                                        console.error(`Failed to delete image: ${tempImagePath}`, err);
-                                    } else {
-                                        console.log(`Successfully deleted image: ${tempImagePath}`);
-                                    }
-                                });
+                                if (fs.existsSync(tempImagePath)) {
+                                    fs.unlink(tempImagePath, (err) => {
+                                        if (err) {
+                                            console.error(`Failed to delete image: ${tempImagePath}`, err);
+                                        } else {
+                                            console.log(`Successfully deleted image: ${tempImagePath}`);
+                                        }
+                                    });
+                                } else {
+                                    console.warn(`File does not exist: ${tempImagePath}`);
+                                }
                             }
-                        }).catch((error) => {
-                            console.error("Error updating MESSAGE_LOG:", error);
-                        });
+                        } catch (error) {
+                            console.error(`An error occurred while processing status:`, error);
+                        }
                     }
                 }
             }
