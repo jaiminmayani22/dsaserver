@@ -617,7 +617,7 @@ const sendInstantMessage = async (req, res) => {
   const { _id, caption, messageType, document, audienceIds, documentType, freezedAudienceIds, freezedSend } = req.body;
 
   const mobileNumbers = [];
-  let freezedAudience = [];
+  const freezedAudience = [];
   const oneHourAgo = Date.now() - 3600000;
   let clients;
   if (freezedSend && freezedSend === 'yes') {
@@ -632,19 +632,18 @@ const sendInstantMessage = async (req, res) => {
         .sort({ updatedAt: -1 });
 
       if (latestLog) {
-        if (latestLog.updatedAt.getTime() > oneHourAgo &&
-          latestLog.status !== 'read' &&
-          latestLog.status !== 'sent' &&
-          latestLog.status !== 'delivered') {
+        if (!['read', 'sent', 'delivered'].includes(latestLog.status) && latestLog.updatedAt.getTime() > oneHourAgo) {
           freezedAudience.push(client._id);
         } else {
           mobileNumbers.push(client.whatsapp_number);
         }
+      } else {
+        mobileNumbers.push(client.whatsapp_number);
       }
     }
   }
 
-  if (freezedAudienceIds.length > 0) {
+  if (freezedAudience.length > 0) {
     await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { freezedAudienceIds: freezedAudience });
   } else {
     await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { freezedAudienceIds: [] });
@@ -1075,11 +1074,11 @@ const whatsappAPISend = async (messageData, _id, messageType, caption) => {
 
     const obj = {
       camId: _id,
-      mobileNumber: data.contacts?.[0]?.input || null,
-      waMessageId: data.messages?.[0]?.id || null,
-      status: data.messages?.[0]?.message_status || 'unknown',
-      msgType: messageType || 'marketing',
-      messageTitle: caption || '',
+      mobileNumber: data.contacts?.[0]?.input,
+      waMessageId: data.messages?.[0]?.id,
+      status: data.messages?.[0]?.message_status,
+      msgType: messageType,
+      messageTitle: caption,
     };
     await MESSAGE_LOG.create(obj);
   } catch (error) {
