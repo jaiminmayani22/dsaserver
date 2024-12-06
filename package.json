@@ -44,6 +44,7 @@
     "nodemailer": "^6.9.2",
     "nodemon": "^3.1.4",
     "path": "^0.12.7",
+    "pm2": "^5.4.3",
     "server-static": "^2.0.5",
     "stream-chat": "^8.9.0",
     "stripe": "^12.9.0",

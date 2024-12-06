@@ -702,7 +702,7 @@ const sendMarketingWhatsAppMessages = async (mobileNumbers, images, _id, caption
             to: `${mobileNumber}`,
             type: "template",
             template: {
-              name: CONSTANT.TEMPLATE_NAME.FOR_IMAGE,
+              name: CONSTANT.TEMPLATE_NAME.FOR_UTILITY,
               language: { code: "en" },
               components: [
                 {
@@ -1023,7 +1023,7 @@ const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, 
           to: `${mobileNumber}`,
           type: "template",
           template: {
-            name: CONSTANT.TEMPLATE_NAME.FOR_IMAGE,
+            name: CONSTANT.TEMPLATE_NAME.FOR_UTILITY,
             language: { code: "en" },
             components: [
               {

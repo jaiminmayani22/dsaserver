@@ -71,6 +71,7 @@ router.post("/deleteClients", auth, userCtrl.deleteClients);
 router.post("/createGroup", auth, userCtrl.createGroup);
 
 router.put("/updateGroupById/:id", auth, userCtrl.updateGroupById);
+router.post("/addContactsToGroup", auth, userCtrl.addContactsToGroup);
 
 router.delete("/deleteGroupById/:id", auth, userCtrl.deleteGroupById);
 

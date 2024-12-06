@@ -1383,6 +1383,60 @@ exports.createGroup = async (req, res) => {
   }
 };
 
+exports.addContactsToGroup = async (req, res) => {
+  const Ids = req.body.Ids;
+  const newGroupId = req.body.groupId;
+
+  try {
+    const newGroupIdsArray = typeof newGroupId === 'string'
+      ? newGroupId.split(',').map(id => id.trim())
+      : Array.isArray(newGroupId)
+        ? newGroupId
+        : [];
+
+    const name = await GROUP_COLLECTION.findOne({ groupId: newGroupId, isDeleted: false });
+    const results = [];
+
+    for (const id of Ids) {
+      const user = await CLIENT_COLLECTION.findById(id);
+
+      if (!user) continue;
+
+      const existingGroupIds = user.groupId && user.groupId !== CONSTANT.NULL_STRING
+        ? user.groupId.split(',').map(id => id.trim())
+        : [];
+      const mergedGroupIds = Array.from(new Set([...existingGroupIds, ...newGroupIdsArray])).join(', ');
+
+      const existingGroupNames = user.groupName && user.groupName !== CONSTANT.NULL_STRING
+        ? user.groupName.split(',').map(name => name.trim())
+        : [];
+      const mergedGroupNames = Array.from(new Set([...existingGroupNames, ...name.name])).join(', ');
+
+      const updatedUser = await CLIENT_COLLECTION.findByIdAndUpdate(
+        id,
+        {
+          groupId: mergedGroupIds,
+          groupName: mergedGroupNames,
+        },
+        { new: true }
+      );
+
+      if (updatedUser) results.push(updatedUser);
+    }
+
+    res.status(200).json({
+      message: CONSTANT.MESSAGE.ADDED_SUCCESSFULLY,
+      data: results,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      message: CONSTANT.MESSAGE.ERROR_OCCURRED,
+      error: error.message,
+    });
+  }
+};
+
 /*
 TODO: POST
 Topic: Create Group
