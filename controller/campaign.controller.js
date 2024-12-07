@@ -653,9 +653,13 @@ const sendInstantMessage = async (req, res) => {
   if (messageType === 'marketing' && imageUrl) {
     try {
       await sendMarketingWhatsAppMessages(mobileNumbers, imageUrl, _id, caption, messageType, documentType);
-      return res.status(200).json({
-        message: CONSTANT.COLLECTION.CAMPAIGN + CONSTANT.MESSAGE.CREATE_SENT_SUCCESSFULLY,
-      });
+      if (res) {
+        return res.status(200).json({
+          message: CONSTANT.COLLECTION.CAMPAIGN + CONSTANT.MESSAGE.CREATE_SENT_SUCCESSFULLY,
+        });
+      } else {
+        console.log("Message sent successfully for campaign : ", req.body.name);
+      }
     } catch (error) {
       return Promise.reject(error);
     }
@@ -663,18 +667,26 @@ const sendInstantMessage = async (req, res) => {
     const selectedRefTemplate = req.body.selectedRefTemplate;
     try {
       await sendUtilityWhatsAppMessages(mobileNumbers, imageUrl, _id, caption, selectedRefTemplate, messageType);
-      return res.status(200).json({
-        message: CONSTANT.COLLECTION.CAMPAIGN + CONSTANT.MESSAGE.CREATE_SENT_SUCCESSFULLY,
-      });
+      if (res) {
+        return res.status(200).json({
+          message: CONSTANT.COLLECTION.CAMPAIGN + CONSTANT.MESSAGE.CREATE_SENT_SUCCESSFULLY,
+        });
+      } else {
+        console.log("Message sent successfully for campaign : ", req.body.name);
+      }
     } catch (error) {
       return Promise.reject(error);
     }
   } else if (!imageUrl && caption) {
     try {
       await sendTextWhatsAppMessages(mobileNumbers, _id, caption, messageType);
-      return res.status(200).json({
-        message: CONSTANT.COLLECTION.CAMPAIGN + CONSTANT.MESSAGE.CREATE_SENT_SUCCESSFULLY,
-      });
+      if (res) {
+        return res.status(200).json({
+          message: CONSTANT.COLLECTION.CAMPAIGN + CONSTANT.MESSAGE.CREATE_SENT_SUCCESSFULLY,
+        });
+      } else {
+        console.log("Message sent successfully for campaign : ", req.body.name);
+      }
     } catch (error) {
       return Promise.reject(error);
     }

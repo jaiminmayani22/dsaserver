@@ -38,18 +38,10 @@ router.post("/signUp", userSignupValidators, userCtrl.signUp);
 router.post("/loginUser", userLoginValidators, userCtrl.loginUser);
 router.post("/verifyToken", auth, userCtrl.verifyToken);
 router.post("/forgotPassword", userForgotValidators, userCtrl.forgotPassword);
-router.post(
-  "/resetForgotPassword",
-  userForgotResetValidators,
-  userCtrl.resetForgotPassword
-);
+router.post("/resetForgotPassword", userForgotResetValidators, userCtrl.resetForgotPassword);
 router.post("/verification", userVerifyValidators, userCtrl.verifyEmail);
-router.post(
-  "/resetPassword",
-  auth,
-  userResetValidators,
-  userCtrl.resetPassword
-);
+router.post("/resetPassword", auth, userCtrl.resetPassword);
+router.post("/updateUser", auth, userCtrl.updateUser);
 
 // CLIENT ROUTES
 router.post("/createClient", auth, userCtrl.createClient);

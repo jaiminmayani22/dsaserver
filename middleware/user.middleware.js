@@ -145,14 +145,7 @@ const userResetValidators = [
 ];
 
 const createUserValidators = [
-  check("email").custom((value) => {    
-    if (!value || value.replace(/\s*/g, "").length <= 0) {
-      throw new Error(CONSTANT.COMMON.EMAIL + CONSTANT.MESSAGE.IS_REQUIRED);
-    }
-    return true;
-  }),
-
-  check("name")
+   check("name")
     .optional()
     .custom((value) => {
       if (value && !nameRegex.test(value)) {

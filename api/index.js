@@ -63,9 +63,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use(helmet());
 app.use(helmet.referrerPolicy());
 
-// if (eventsCronjob) {
-//   eventsCronjob.postBumpUpdate();
-// }
+if (eventsCronjob) {
+  eventsCronjob.shceduleCampaign();
+}
 
 app.use(
   morgan(function (tokens, req, res) {

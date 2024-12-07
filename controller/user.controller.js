@@ -135,9 +135,11 @@ exports.loginUser = (req, res) => {
   }
 };
 
-exports.verifyToken = (req, res) => {
+exports.verifyToken = async (req, res) => {
   try {
-    res.status(200).send({ message: CONSTANT.MESSAGE.TOKEN_VERIFIED });
+    const data = req.decoded;
+    const result = await USER_COLLECTION.findById(data.userId);
+    res.status(200).send({ data: result, message: CONSTANT.MESSAGE.TOKEN_VERIFIED });
   } catch (error) {
     return res.status(500).send({
       message: error.message || CONSTANT.MESSAGE.ERROR_OCCURRED,
@@ -296,10 +298,11 @@ Method: POST
 Topic: reset password
 */
 exports.resetPassword = async (req, res) => {
-  const { oldPassword, newPassword, confirmPassword, email } = req.body;
+  const { oldPassword, newPassword, confirmPassword } = req.body;
 
   try {
-    const user = await USER_COLLECTION.findOne({ email: email });
+    const { userId, _ } = commonService.getUserIdFromToken(req);
+    const user = await USER_COLLECTION.findById(userId);
     if (!user) {
       return res.status(401).send({
         message: CONSTANT.MESSAGE.USER_NOT_FOUND,
@@ -329,11 +332,11 @@ exports.resetPassword = async (req, res) => {
     user.password = encryptedPassword;
     await user.save();
 
-    let result = {
-      email: user.email,
-      name: user.name,
-    };
-    passwordResetSuccessEmail(result);
+    // let result = {
+    //   email: user.email,
+    //   name: user.name,
+    // };
+    // passwordResetSuccessEmail(result);
 
     return res.status(200).send({
       message: CONSTANT.COMMON.PASSWORD + CONSTANT.MESSAGE.SET_SUCCESSFULLY,
@@ -344,6 +347,47 @@ exports.resetPassword = async (req, res) => {
     });
   }
 };
+
+exports.updateUser = async (req, res) => {
+  try {
+    const updatedFields = req.body;
+    const { userId } = commonService.getUserIdFromToken(req);
+
+    const result = await USER_COLLECTION.findByIdAndUpdate(
+      userId,
+      updatedFields,
+      { new: true }
+    );
+
+    let userObj = {
+      name: result.name,
+      email: result.email,
+      phoneNo: result.phoneNo,
+      userId: result._id,
+    };
+    const token = jwt.sign(userObj, process.env.superSecret, {
+      expiresIn: '7d',
+    });
+
+    if (!result) {
+      return res.status(404).json({
+        message: `${CONSTANT.COLLECTION.CLIENT} ${CONSTANT.MESSAGE.NOT_FOUND}`,
+      });
+    }
+
+    res.status(200).json({
+      message: CONSTANT.MESSAGE.UPDATED_SUCCESSFULLY,
+      data: result,
+      token: token,
+    });
+  } catch (err) {
+    res.status(500).json({
+      message: CONSTANT.MESSAGE.SOMETHING_WRONG,
+      error: err.message,
+    });
+  }
+};
+
 
 /*
 TODO: POST
@@ -1384,33 +1428,28 @@ exports.createGroup = async (req, res) => {
 };
 
 exports.addContactsToGroup = async (req, res) => {
-  const Ids = req.body.Ids;
-  const newGroupId = req.body.groupId;
+  const { Ids, groupId } = req.body;
 
   try {
-    const newGroupIdsArray = typeof newGroupId === 'string'
-      ? newGroupId.split(',').map(id => id.trim())
-      : Array.isArray(newGroupId)
-        ? newGroupId
-        : [];
+    const newGroupId = groupId.trim();
 
     const name = await GROUP_COLLECTION.findOne({ groupId: newGroupId, isDeleted: false });
     const results = [];
 
     for (const id of Ids) {
       const user = await CLIENT_COLLECTION.findById(id);
-
       if (!user) continue;
-
       const existingGroupIds = user.groupId && user.groupId !== CONSTANT.NULL_STRING
         ? user.groupId.split(',').map(id => id.trim())
         : [];
-      const mergedGroupIds = Array.from(new Set([...existingGroupIds, ...newGroupIdsArray])).join(', ');
+
+      const mergedGroupIds = Array.from(new Set([...existingGroupIds, newGroupId])).join(', ');
 
       const existingGroupNames = user.groupName && user.groupName !== CONSTANT.NULL_STRING
         ? user.groupName.split(',').map(name => name.trim())
         : [];
-      const mergedGroupNames = Array.from(new Set([...existingGroupNames, ...name.name])).join(', ');
+
+      const mergedGroupNames = Array.from(new Set([...existingGroupNames, name.name])).join(', ');
 
       const updatedUser = await CLIENT_COLLECTION.findByIdAndUpdate(
         id,
@@ -1429,7 +1468,6 @@ exports.addContactsToGroup = async (req, res) => {
       data: results,
     });
   } catch (error) {
-    console.error(error);
     res.status(500).json({
       message: CONSTANT.MESSAGE.ERROR_OCCURRED,
       error: error.message,
@@ -1622,29 +1660,31 @@ TODO: POST
 Topic: Get All Members of Group
 */
 exports.getMembersForGroup = async (req, res) => {
-  const errors = validationResult(req).array();
-  if (errors && errors.length > 0) {
-    let messArr = errors.map((a) => a.msg);
-    return res.status(400).send({
-      message: CONSTANT.MESSAGE.REQUIRED_FIELDS_MISSING,
-      error: messArr.join(", "),
-    });
-  } else {
-    try {
-      const groupId = req.body.groupId;
-      await CLIENT_COLLECTION.find({ groupId: new RegExp(`(^|,)${groupId}(,|$)`), isDeleted: false })
-        .then((clients) => {
-          return res.status(200).send(clients);
-        })
-        .catch((err) => {
-          return res.status(404).send({
-            message: err.message || CONSTANT.MESSAGE.ERROR_OCCURRED,
-          });
-        });
-    } catch (err) {
-      return res.status(500).send({
-        message: err.message || CONSTANT.MESSAGE.ERROR_OCCURRED,
+  try {
+    const groupId = req.body.groupId?.trim();
+    if (!groupId) {
+      return res.status(400).send({
+        message: CONSTANT.MESSAGE.INVALID_GROUP_ID,
       });
     }
+
+    const regex = new RegExp(`(^|,\\s*)${groupId}(,|\\s*|$)`);
+    const clients = await CLIENT_COLLECTION.find({
+      groupId: regex,
+      isDeleted: false,
+    });
+
+    if (!clients || clients.length === 0) {
+      return res.status(404).send({
+        message: CONSTANT.MESSAGE.NO_MEMBERS_FOUND,
+      });
+    }
+
+    return res.status(200).send(clients);
+
+  } catch (error) {
+    return res.status(500).send({
+      message: error.message || CONSTANT.MESSAGE.ERROR_OCCURRED,
+    });
   }
 };
