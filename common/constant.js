@@ -493,6 +493,7 @@ module.exports = Object.freeze({
     TEMPLATE_IMAGES_PATH: "./public/template-images",
     TEMPLATE_FORMAT_PATH: "./public/template-format",
     TEMPLATE_REFERENCE_FORMAT_PATH: "./public/template-reference-format",
+    CHAT: "./public/chat",
   },
 
   TEMPLATE_NAME: {

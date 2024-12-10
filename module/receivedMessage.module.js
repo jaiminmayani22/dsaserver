@@ -7,6 +7,8 @@ const ReceivedMessageSchema = mongoose.Schema(
     fromName: { type: String, default: CONSTANT.NULL_STRING },
     message: { type: String, default: CONSTANT.NULL_STRING },
     ticketNumber: { type: String, default: CONSTANT.NULL_STRING },
+    document: {},
+    type: { type: String, default: CONSTANT.NULL_STRING },
     isDeleted: { type: Boolean, default: false },
   },
   {
