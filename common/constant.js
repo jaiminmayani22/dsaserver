@@ -397,90 +397,6 @@ module.exports = Object.freeze({
   },
   RESET_UI_URL: "/reset-password",
   USER_PHOTO: "userPhoto",
-  PAYMENT_CONSTANT: {
-    REASON_LIST: [
-      { key: "duplicate", value: "Duplicate" },
-      { key: "fraudulent", value: "Fraudulent" },
-      { key: "requested_by_customer", value: "Requested by customer" },
-      { key: "abandoned", value: "Abandoned" },
-      { key: "failed_invoice", value: "Failed Invoice" },
-    ],
-    STATUS_LIST: {
-      REQUIRES_ACTION: "requires_action",
-      SUCCEEDED: "succeeded",
-    },
-    BUMP_LIST: [
-      {
-        key: "bump_once_instant",
-        title: "Bump Once, instantly",
-        price: 2,
-        per_bump: 2,
-        day: 1,
-      },
-      {
-        key: "bump_daily_three_days",
-        title: "Bump Daily for 3days",
-        price: 5,
-        per_bump: 2,
-        day: 3,
-      },
-      {
-        key: "bump_twice_daily_three_days",
-        title: "Bump Twice Daily for 3days,for 3days",
-        price: 8,
-        per_bump: 2,
-        day: 3,
-      },
-      {
-        key: "bump_daily_seven_days",
-        title: "Bump Daily for 7days",
-        price: 9,
-        per_bump: 2,
-        day: 7,
-      },
-    ],
-    MESSAGE: {
-      PAYMENT_SUCCESS: "Payment succeeded!",
-      PAYMENT_FAIL: "Payment failed!",
-      CARD_CREATE_FAIL: "Fail to create card!",
-      POST_ALREADY_ON_BUMP: "Post already on bump!",
-    },
-    PAYMENT_TYPE_LIST: ["card", "bank_account"],
-    CANCELLATION_REASON_LIST: [
-      "duplicate",
-      "fraudulent",
-      "requested_by_customer",
-      "abandoned",
-      "failed_invoice",
-      "void_invoice",
-      "automatic",
-    ],
-    REQUIRED_FIELD:
-      "The request was unacceptable, often due to missing a required parameter",
-    NOT_FOUND: "The requested resource doesn't exist.",
-    STRUCTURE_LIST: [
-      "government_instrumentality",
-      "governmental_unit",
-      "incorporated_non_profit",
-      "limited_liability_partnership",
-      "multi_member_llc",
-      "private_company",
-      "private_corporation",
-      "private_partnership",
-      "public_company",
-      "public_corporation",
-      "public_partnership",
-      "single_member_llc",
-      "sole_proprietorship",
-      "tax_exempt_government_instrumentality",
-      "unincorporated_association",
-      "unincorporated_non_profit",
-      "free_zone_llc",
-      "sole_establishment",
-      "free_zone_establishment",
-      "llc",
-    ],
-  },
 
   UPLOAD_DOC_PATH: {
     GROUP_IMAGES: "./public/group_images",
@@ -496,9 +412,17 @@ module.exports = Object.freeze({
     CHAT: "./public/chat",
   },
 
+  //GREYPIX TEMPLATES
+  // TEMPLATE_NAME: {
+  //   FOR_UTILITY: "schedule_msg_wt_utility_new",
+  //   FOR_VIDEO: "schedule_msg_wt_vdo",
+  //   FOR_DOCUMENT: "schedule_msg_wt_doc",
+  //   FOR_ONLY_TEXT: "wt_only_text"
+  // }
+ 
+  //DSA TEMPLATES
   TEMPLATE_NAME: {
-    FOR_IMAGE: "schedule_msg_wt_custom",
-    FOR_UTILITY: "schedule_msg_wt_utility_new",
+    FOR_UTILITY: "schedule_msg_wt_custom",
     FOR_VIDEO: "schedule_msg_wt_vdo",
     FOR_DOCUMENT: "schedule_msg_wt_doc",
     FOR_ONLY_TEXT: "wt_only_text"

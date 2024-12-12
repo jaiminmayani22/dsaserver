@@ -45,11 +45,9 @@ router.post("/updateUser", auth, userCtrl.updateUser);
 
 // CLIENT ROUTES
 router.post("/createClient", auth, userCtrl.createClient);
-
 router.post("/getAllClient", auth, userCtrl.getAllClient);
 router.post("/getAllClientCount", auth, userCtrl.getAllClientCount);
 router.get("/getClientById/:id", auth, userCtrl.getClientById);
-
 router.put("/updateClientById/:id", auth, userCtrl.updateClientById);
 router.post("/updateClientProfile", auth, userCtrl.updateClientProfile);
 router.post("/updateClientCompanyProfile", auth, userCtrl.updateClientCompanyProfile);
@@ -61,10 +59,8 @@ router.post("/deleteClients", auth, userCtrl.deleteClients);
 
 //GROUP ROUTES
 router.post("/createGroup", auth, userCtrl.createGroup);
-
 router.put("/updateGroupById/:id", auth, userCtrl.updateGroupById);
 router.post("/addContactsToGroup", auth, userCtrl.addContactsToGroup);
-
 router.delete("/deleteGroupById/:id", auth, userCtrl.deleteGroupById);
 
 router.get("/getGroupById/:id", auth, userCtrl.getGroupById);
