@@ -348,6 +348,7 @@ exports.createRetargetCampaign = async (req, res) => {
         addedBy: userId,
         groups: obj.groups,
         audienceIds: obj.audienceIds?.map(item => item._id),
+        countAudience: obj.countAudience,
       };
       if (data.type === 'schedule') {
         data.schedule = obj.schedule;
