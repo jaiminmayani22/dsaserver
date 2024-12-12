@@ -333,6 +333,13 @@ exports.createRetargetCampaign = async (req, res) => {
     try {
       const { userId, _ } = commonService.getUserIdFromToken(req);
       let obj = req.body;
+      const numbers = obj.audienceIds;
+      const clients = await CLIENT_MODULE.find({
+        whatsapp_number: { $in: numbers },
+        isDeleted: false,
+      });
+      const ids = clients.map(client => client._id);
+
       let data = {
         name: obj.name,
         type: obj.type,
@@ -347,8 +354,8 @@ exports.createRetargetCampaign = async (req, res) => {
         selectedRefTemplate: obj.selectedRefTemplate,
         addedBy: userId,
         groups: obj.groups,
-        audienceIds: obj.audienceIds?.map(item => item._id),
-        countAudience: obj.countAudience,
+        audienceIds: ids,
+        countAudience: ids.length,
       };
       if (data.type === 'schedule') {
         data.schedule = obj.schedule;
@@ -626,7 +633,6 @@ const sendInstantMessage = async (req, res) => {
   } else {
     clients = await CLIENT_MODULE.find({ _id: { $in: audienceIds }, isDeleted: false });
   }
-
   for (const client of clients) {
     if (client.whatsapp_number) {
       const latestLog = await MESSAGE_LOG.findOne({ mobileNumber: client.whatsapp_number, isDeleted: false })
@@ -651,6 +657,7 @@ const sendInstantMessage = async (req, res) => {
   }
 
   const imageUrl = document.url;
+
   if (messageType === 'marketing' && imageUrl) {
     try {
       await sendMarketingWhatsAppMessages(mobileNumbers, imageUrl, _id, caption, messageType, documentType);
