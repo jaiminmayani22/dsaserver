@@ -422,9 +422,9 @@ module.exports = Object.freeze({
  
   //DSA TEMPLATES
   TEMPLATE_NAME: {
-    FOR_UTILITY: "schedule_msg_wt_custom",
+    FOR_UTILITY: "schedule_msg_wt_image_utility",
     FOR_VIDEO: "schedule_msg_wt_vdo",
     FOR_DOCUMENT: "schedule_msg_wt_doc",
-    FOR_ONLY_TEXT: "wt_only_text"
+    FOR_ONLY_TEXT: "wt_only_text_utilty"
   }
 });

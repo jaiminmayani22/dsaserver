@@ -966,12 +966,16 @@ exports.updateClientProfile = async (req, res) => {
           let obj = {};
           const id = req.body._id;
 
-          obj[CONSTANT.FIELD.PROFILE_PICTURE] = files[0];
-          obj[CONSTANT.FIELD.PROFILE_PICTURE][CONSTANT.COMMON.URL] =
-            process.env.BACKEND_URL +
-            folder +
-            "/" +
-            files[0][CONSTANT.COMMON.FILE_NAME];
+          if (files[0]) {
+            obj[CONSTANT.FIELD.PROFILE_PICTURE] = files[0];
+            obj[CONSTANT.FIELD.PROFILE_PICTURE][CONSTANT.COMMON.URL] =
+              process.env.BACKEND_URL +
+              folder +
+              "/" +
+              files[0][CONSTANT.COMMON.FILE_NAME];
+          } else {
+            obj[CONSTANT.FIELD.PROFILE_PICTURE] = '';
+          }
 
           CLIENT_COLLECTION.findByIdAndUpdate(
             id,
@@ -1008,7 +1012,6 @@ exports.updateClientCompanyProfile = async (req, res) => {
       req,
       res,
       async (err, profile, files) => {
-        0
         if (err && files && files.length <= 0) {
           return res.status(400).send({
             message: err.message || CONSTANT.MESSAGE.PROFILE_NOT_UPDATE,
@@ -1017,12 +1020,16 @@ exports.updateClientCompanyProfile = async (req, res) => {
           let obj = {};
           const id = req.body._id;
 
-          obj[CONSTANT.FIELD.COMPANY_PROFILE_PICTURE] = files[0];
-          obj[CONSTANT.FIELD.COMPANY_PROFILE_PICTURE][CONSTANT.COMMON.URL] =
-            process.env.BACKEND_URL +
-            folder +
-            "/" +
-            files[0][CONSTANT.COMMON.FILE_NAME];
+          if (files[0]) {
+            obj[CONSTANT.FIELD.COMPANY_PROFILE_PICTURE] = files[0];
+            obj[CONSTANT.FIELD.COMPANY_PROFILE_PICTURE][CONSTANT.COMMON.URL] =
+              process.env.BACKEND_URL +
+              folder +
+              "/" +
+              files[0][CONSTANT.COMMON.FILE_NAME];
+          } else {
+            obj[CONSTANT.FIELD.COMPANY_PROFILE_PICTURE] = '';
+          }
 
           CLIENT_COLLECTION.findByIdAndUpdate(
             id,
