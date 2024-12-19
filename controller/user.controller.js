@@ -1598,7 +1598,7 @@ exports.updateGroupById = async (req, res) => {
 TODO: DELETE
 Topic: delete Group by id
 */
-exports.deleteGroupById = (req, res) => {
+exports.deleteGroupById = async (req, res) => {
   const Id = req.params.id;
   try {
     if (!commonService.isValidObjId(Id)) {
@@ -1606,23 +1606,42 @@ exports.deleteGroupById = (req, res) => {
         message: CONSTANT.MESSAGE.INVALID_ID,
       });
     } else {
-      GROUP_COLLECTION.findOne({ _id: Id, isDeleted: false }).then((group) => {
+      GROUP_COLLECTION.findOne({ _id: Id, isDeleted: false }).then(async (group) => {
         if (!group) {
           return res.status(403).send({
             message: CONSTANT.MESSAGE.GROUP_NOT_FOUND,
           });
         } else {
-          GROUP_COLLECTION.findByIdAndDelete(Id).then(async () => {
+          const regex = new RegExp(`(^|,\\s*)${group.groupId}(,|\\s*|$)`);
+          const clients = await CLIENT_COLLECTION.find({
+            groupId: regex,
+            isDeleted: false,
+          });
+          for (const client of clients) {
+            const groupIds = client.groupId
+              ? client.groupId.split(",").map((id) => id.trim())
+              : [];
+
+            const updatedGroupIds = groupIds.filter((groupId) => groupId !== group.groupId);
+            const normalizedGroupIds = updatedGroupIds.map((id) => id.padStart(3, "0"));
+            const updatedGroups = await GROUP_COLLECTION.find({ groupId: { $in: normalizedGroupIds } });
+            const groupIdsString = updatedGroups.map((group) => group.groupId).join(", ");
+            const groupNames = updatedGroups.map((group) => group.name).join(", ");
+
+            await CLIENT_COLLECTION.findByIdAndUpdate(client._id, {
+              $set: {
+                groupId: groupIdsString || null,
+                groupName: groupNames || null,
+              },
+            });
+          }
+
+          GROUP_COLLECTION.findByIdAndDelete(Id).then(() => {
             res.status(200).json({
               data: Id,
-              message:
-                CONSTANT.COLLECTION.GROUP +
-                CONSTANT.MESSAGE.DELETED_SUCCESSFULLY,
+              message: CONSTANT.COLLECTION.GROUP + CONSTANT.MESSAGE.DELETED_SUCCESSFULLY,
             });
-          })
-            .catch((err) => {
-              return res.status(500).send({ message: err.message });
-            });
+          });
         }
       });
     }
