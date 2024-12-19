@@ -1196,6 +1196,12 @@ exports.exportClientToCSV = async (req, res) => {
       query.groupId = { $regex: new RegExp(`(^|,\\s*)${groupId}(,|\\s*|$)`) };
     }
     const clients = await CLIENT_COLLECTION.find(query);
+    const processedClients = clients.map(client => ({
+      ...client._doc,
+      mobile_number: client.mobile_number ? `'${client.mobile_number}` : "",
+      whatsapp_number: client.whatsapp_number ? `'${client.whatsapp_number}` : ""
+    }));
+
     const fields = [
       { label: "Name", value: "name" },
       { label: "Company_Name", value: "company_name" },
@@ -1212,7 +1218,7 @@ exports.exportClientToCSV = async (req, res) => {
     ];
 
     const json2csvParser = new Parser({ fields });
-    const csv = json2csvParser.parse(clients);
+    const csv = json2csvParser.parse(processedClients);
 
     res.setHeader("Content-Type", "text/csv");
     res.setHeader("Content-Disposition", "attachment; filename=clients.csv");
