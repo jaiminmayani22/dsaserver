@@ -1193,10 +1193,9 @@ exports.exportClientToCSV = async (req, res) => {
     const groupId = await req.query.groupId;
     let query = { isDeleted: false };
     if (groupId) {
-      query.groupId = { $regex: new RegExp(`(^|,)${groupId}(,|$)`) };
+      query.groupId = { $regex: new RegExp(`(^|,\\s*)${groupId}(,|\\s*|$)`) };
     }
     const clients = await CLIENT_COLLECTION.find(query);
-
     const fields = [
       { label: "Name", value: "name" },
       { label: "Company_Name", value: "company_name" },
@@ -1320,12 +1319,14 @@ exports.importClientFromCSV = async (req, res) => {
               : [];
             const normalizedGroupIds = groupIds.map((id) => id.padStart(3, "0"));
             const groups = await GROUP_COLLECTION.find({ groupId: { $in: normalizedGroupIds } });
+            const groupIdsString = groups.map((group) => group.groupId).join(", ");
             const groupNames = groups.map((group) => group.name).join(", ");
+            clientObj.groupId = groupIdsString;
             clientObj.groupName = groupNames;
 
             if (existingClient) {
-              const updatedClient = await CLIENT_COLLECTION.findByIdAndUpdate(
-                existingClient._id,
+              const updatedClient = await CLIENT_COLLECTION.findOneAndUpdate(
+                { _id: existingClient._id, isDeleted: false },
                 { $set: clientObj },
                 { new: true }
               );
@@ -1352,6 +1353,7 @@ exports.importClientFromCSV = async (req, res) => {
           const contactList = await CLIENT_COLLECTION.find({
             groupId: { $regex: new RegExp(`(^|,)${selectedGroup}(,|$)`) },
             whatsapp_number: { $in: importedWhatsappNumbers },
+            isDeleted: false
           });
           res.status(200).send({
             message: "Clients imported successfully in this group",
@@ -1361,6 +1363,7 @@ exports.importClientFromCSV = async (req, res) => {
         } else {
           const contactList = await CLIENT_COLLECTION.find({
             whatsapp_number: { $in: importedWhatsappNumbers },
+            isDeleted: false
           });
           res.status(200).send({
             message: "Clients imported successfully",
@@ -1444,7 +1447,7 @@ exports.addContactsToGroup = async (req, res) => {
     const results = [];
 
     for (const id of Ids) {
-      const user = await CLIENT_COLLECTION.findById(id);
+      const user = await CLIENT_COLLECTION.findOne({ _id: id, isDeleted: false });
       if (!user) continue;
       const existingGroupIds = user.groupId && user.groupId !== CONSTANT.NULL_STRING
         ? user.groupId.split(',').map(id => id.trim())
@@ -1458,11 +1461,13 @@ exports.addContactsToGroup = async (req, res) => {
 
       const mergedGroupNames = Array.from(new Set([...existingGroupNames, name.name])).join(', ');
 
-      const updatedUser = await CLIENT_COLLECTION.findByIdAndUpdate(
-        id,
+      const updatedUser = await CLIENT_COLLECTION.findOneAndUpdate(
+        { _id: id, isDeleted: false },
         {
-          groupId: mergedGroupIds,
-          groupName: mergedGroupNames,
+          $set: {
+            groupId: mergedGroupIds,
+            groupName: mergedGroupNames,
+          },
         },
         { new: true }
       );
