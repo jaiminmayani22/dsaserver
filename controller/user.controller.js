@@ -1612,19 +1612,14 @@ exports.deleteGroupById = (req, res) => {
             message: CONSTANT.MESSAGE.GROUP_NOT_FOUND,
           });
         } else {
-          GROUP_COLLECTION.findByIdAndUpdate(
-            Id,
-            { $set: { isDeleted: true } },
-            { new: true }
-          )
-            .then(async (data) => {
-              res.status(200).json({
-                data: Id,
-                message:
-                  CONSTANT.COLLECTION.GROUP +
-                  CONSTANT.MESSAGE.DELETED_SUCCESSFULLY,
-              });
-            })
+          GROUP_COLLECTION.findByIdAndDelete(Id).then(async () => {
+            res.status(200).json({
+              data: Id,
+              message:
+                CONSTANT.COLLECTION.GROUP +
+                CONSTANT.MESSAGE.DELETED_SUCCESSFULLY,
+            });
+          })
             .catch((err) => {
               return res.status(500).send({ message: err.message });
             });
