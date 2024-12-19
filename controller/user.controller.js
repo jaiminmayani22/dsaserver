@@ -1266,12 +1266,13 @@ exports.importClientFromCSV = async (req, res) => {
 
             const sanitizePhoneNumber = (number) => {
               if (!number) return null;
-              let sanitizedNumber = number.replace(/\s+/g, "");
-              if (/^\+91\d{10}$/.test(sanitizedNumber)) {
-                return sanitizedNumber;
-              }
+              let sanitizedNumber = number.replace(/\s+/g, "").replace(/[^0-9+]/g, "");
               if (/^\d{10}$/.test(sanitizedNumber)) {
                 return `+91${sanitizedNumber}`;
+              } else if (/^\+91\d{10}$/.test(sanitizedNumber)) {
+                return sanitizedNumber;
+              } else if (/^91\d{10}$/.test(sanitizedNumber)) {
+                return `+${sanitizedNumber}`;
               }
               return null;
             };
