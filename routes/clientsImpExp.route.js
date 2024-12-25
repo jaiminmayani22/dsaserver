@@ -7,6 +7,6 @@ const upload = multer({ dest: "../public/clients_csv/",limits: { fileSize: 1024 
 
 router.post("/importClientFromCSV", upload.single("file"), auth, userCtrl.importClientFromCSV);
 // router.get("/exportClientToCSV", auth, userCtrl.exportClientToCSV);
-router.get("/exportClientToCSV", userCtrl.exportClientToCSV);
+router.post("/exportClientToCSV", userCtrl.exportClientToCSV);
 
 module.exports = router;

@@ -1126,7 +1126,7 @@ exports.getMessagesForCampaign = async (req, res) => {
           from: "clients",
           localField: "mobileNumber",
           foreignField: "whatsapp_number",
-          as: "clientInfo", // Resulting array will be stored in this field
+          as: "clientInfo",
         },
       },
       {
@@ -1137,7 +1137,7 @@ exports.getMessagesForCampaign = async (req, res) => {
       },
       {
         $match: {
-          "clientInfo.isDeleted": false,
+          "clientInfo.isDeleted": { $ne: true }, 
         },
       },
       {

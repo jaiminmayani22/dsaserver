@@ -56,12 +56,14 @@ router.post("/bulkCompanyProfilePictureUpload", auth, uploadCompanyProfile.array
 
 router.delete("/deleteClientById/:id", auth, userCtrl.deleteClientById);
 router.post("/deleteClients", auth, userCtrl.deleteClients);
+router.post("/removeDuplicates", auth, userCtrl.removeDuplicates);
 
 //GROUP ROUTES
 router.post("/createGroup", auth, userCtrl.createGroup);
 router.put("/updateGroupById/:id", auth, userCtrl.updateGroupById);
 router.post("/addContactsToGroup", auth, userCtrl.addContactsToGroup);
 router.delete("/deleteGroupById/:id", auth, userCtrl.deleteGroupById);
+router.delete("/removeGroupIDFromClient", auth, userCtrl.removeGroupIDFromClient);
 
 router.get("/getGroupById/:id", auth, userCtrl.getGroupById);
 router.post("/getAllGroups", auth, userCtrl.getAllGroups);

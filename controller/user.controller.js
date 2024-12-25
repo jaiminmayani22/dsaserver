@@ -885,18 +885,24 @@ Topic: delete Multiple Clients
 */
 exports.deleteClients = async (req, res) => {
   try {
-    const { ids } = req.body;
-    if (!Array.isArray(ids) || ids.length === 0) {
-      return res.status(400).send({ message: CONSTANT.MESSAGE.NOT_FOUND });
+    const { ids, numbers } = req.body;
+    if (ids?.length > 0 && !numbers) {
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).send({ message: CONSTANT.MESSAGE.NOT_FOUND });
+      }
+      const result = await CLIENT_COLLECTION.updateMany(
+        { _id: { $in: ids } },
+        { $set: { isDeleted: true } }
+      );
+      res.status(200).send(ids);
+    } else {
+      const result = await CLIENT_COLLECTION.updateMany(
+        { whatsapp_number: { $in: numbers } },
+        { $set: { isDeleted: true } }
+      );
+      res.status(200).send(result);
     }
-
-    const result = await CLIENT_COLLECTION.updateMany(
-      { _id: { $in: ids } },
-      { $set: { isDeleted: true } }
-    );
-    res.status(200).send(ids);
   } catch (error) {
-    console.error('Error deleting contacts:', error);
     res.status(500).send({ message: 'Error deleting contacts', error: error.message });
   }
 };
@@ -924,27 +930,24 @@ TODO: POSt
 Topic: restore Multiple Clients
 */
 exports.restoreClients = async (req, res) => {
-  try {
-    const ids = req.body.ids;
-    if (!Array.isArray(ids) || ids.length === 0) {
-      return res.status(400).send({ message: CONSTANT.MESSAGE.NOT_FOUND });
-    }
+  const ids = req.body.ids;
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).send({ message: CONSTANT.MESSAGE.NOT_FOUND });
+  }
 
-    await CLIENT_COLLECTION.updateMany(
+  try {
+    const response = await CLIENT_COLLECTION.updateMany(
       { _id: { $in: ids } },
       { $set: { isDeleted: false } }
-    )
-      .then((response) => {
-        if (response.ok) {
-          res.status(200).send(ids);
-        }
-      })
-      .catch((error) => {
-        res.status(500).send({ message: 'Error restoring contacts', error: error.message });
-      });
+    );
+
+    if (response.modifiedCount > 0) {
+      res.status(200).send(ids);
+    } else {
+      res.status(404).send("Failed to Restore: No documents were updated");
+    }
   } catch (error) {
-    console.error('Error deleting contacts:', error);
-    res.status(500).send({ message: 'Error deleting contacts', error: error.message });
+    res.status(500).send({ message: "Error restoring contacts", error: error.message });
   }
 };
 
@@ -1190,11 +1193,18 @@ Topic: Exports clients to CSV
 */
 exports.exportClientToCSV = async (req, res) => {
   try {
-    const groupId = await req.query.groupId;
+    const groupId = req.query.groupId;
+    const numbers = req.body;
     let query = { isDeleted: false };
+
     if (groupId) {
       query.groupId = { $regex: new RegExp(`(^|,\\s*)${groupId}(,|\\s*|$)`) };
     }
+
+    if (numbers && Array.isArray(numbers) && numbers.length > 0) {
+      query.whatsapp_number = { $in: numbers };
+    }
+
     const clients = await CLIENT_COLLECTION.find(query);
     const processedClients = clients.map(client => ({
       ...client._doc,
@@ -1299,37 +1309,43 @@ exports.importClientFromCSV = async (req, res) => {
                 return;
               }
             }
-
             const existingClient = await CLIENT_COLLECTION.findOne({
               whatsapp_number: Whatsapp_Number,
               isDeleted: false,
             });
 
-            const clientObj = {
-              name: clientData?.Name,
-              company_name: clientData?.Company_Name,
-              mobile_number: Mobile_Number,
-              whatsapp_number: Whatsapp_Number,
-              email: clientData?.Email,
-              city: clientData?.City,
-              district: clientData?.District,
-              address: clientData?.Address,
-              instagramID: clientData?.InstagramID,
-              facebookID: clientData?.FacebookID,
-              isFavorite: clientData?.Is_Favorite,
-              groupId: selectedGroup ? selectedGroup : clientData?.Group_ID,
-              isDeleted: false,
-            };
+            const combinedGroupIds = new Set();
+            if (existingClient?.groupId) {
+              existingClient.groupId.split(",").map((id) => combinedGroupIds.add(id.trim()));
+            }
+            if (clientData?.Group_ID) {
+              clientData.Group_ID.split(",").map((id) => combinedGroupIds.add(id.trim()));
+            }
+            if (selectedGroup) {
+              combinedGroupIds.add(selectedGroup.trim());
+            }
 
-            const groupIds = clientObj?.groupId
-              ? clientObj?.groupId.split(",").map((id) => id.trim())
-              : [];
-            const normalizedGroupIds = groupIds.map((id) => id.padStart(3, "0"));
+            const normalizedGroupIds = Array.from(combinedGroupIds).map((id) => id.padStart(3, "0"));
             const groups = await GROUP_COLLECTION.find({ groupId: { $in: normalizedGroupIds } });
             const groupIdsString = groups.map((group) => group.groupId).join(", ");
             const groupNames = groups.map((group) => group.name).join(", ");
-            clientObj.groupId = groupIdsString;
-            clientObj.groupName = groupNames;
+
+            const clientObj = {
+              name: clientData?.Name ?? null,
+              company_name: clientData?.Company_Name ?? null,
+              mobile_number: Mobile_Number ?? null,
+              whatsapp_number: Whatsapp_Number ?? null,
+              email: clientData?.Email ?? null,
+              city: clientData?.City ?? null,
+              district: clientData?.District ?? null,
+              address: clientData?.Address ?? null,
+              instagramID: clientData?.InstagramID ?? null,
+              facebookID: clientData?.FacebookID ?? null,
+              isFavorite: clientData?.Is_Favorite ?? false,
+              groupId: groupIdsString,
+              groupName: groupNames,
+              isDeleted: false,
+            };
 
             if (existingClient) {
               const updatedClient = await CLIENT_COLLECTION.findOneAndUpdate(
@@ -1349,7 +1365,6 @@ exports.importClientFromCSV = async (req, res) => {
       })
       .on("end", async () => {
         await Promise.all(processingPromises);
-
         const importedWhatsappNumbers = Array.isArray(results)
           ? results
             .filter((item) => item.action === "inserted" || item.action === "updated")
@@ -1718,6 +1733,102 @@ exports.getMembersForGroup = async (req, res) => {
   } catch (error) {
     return res.status(500).send({
       message: error.message || CONSTANT.MESSAGE.ERROR_OCCURRED,
+    });
+  }
+};
+
+exports.removeGroupIDFromClient = async (req, res) => {
+  const Id = req.body.groupId;
+  try {
+    GROUP_COLLECTION.findOne({
+      groupId: { $regex: `(^|,\\s*)0*${Id}(,|\\s*|$)`, $options: "i" },
+      // isDeleted: false
+    }).then(async (group) => {
+      if (!group) {
+        return res.status(403).send({
+          message: CONSTANT.MESSAGE.GROUP_NOT_FOUND,
+        });
+      } else {
+        const regex = new RegExp(`(^|,\\s*)${group.groupId}(,|\\s*|$)`);
+        const clients = await CLIENT_COLLECTION.find({
+          groupId: regex,
+          isDeleted: false,
+        });
+        for (const client of clients) {
+          const groupIds = client.groupId
+            ? client.groupId.split(",").map((id) => id.trim())
+            : [];
+
+          const updatedGroupIds = groupIds.filter((groupId) => groupId !== group.groupId);
+          const normalizedGroupIds = updatedGroupIds.map((id) => id.padStart(3, "0"));
+          const updatedGroups = await GROUP_COLLECTION.find({ groupId: { $in: normalizedGroupIds } });
+          const groupIdsString = updatedGroups.map((group) => group.groupId).join(", ");
+          const groupNames = updatedGroups.map((group) => group.name).join(", ");
+
+          await CLIENT_COLLECTION.findByIdAndUpdate(client._id, {
+            $set: {
+              groupId: groupIdsString || null,
+              groupName: groupNames || null,
+            },
+          });
+        }
+
+        res.status(200).json({
+          count: clients.length,
+          message: "Group Id from Clients " + CONSTANT.MESSAGE.DELETED_SUCCESSFULLY,
+        });
+      }
+    });
+  } catch (err) {
+    res.status(500).json({
+      message: CONSTANT.MESSAGE.SOMETHING_WRONG,
+      err: err.message,
+    });
+  }
+};
+
+exports.removeDuplicates = async (req, res) => {
+  try {
+    const duplicates = await CLIENT_COLLECTION.aggregate([
+      {
+        $group: {
+          _id: "$whatsapp_number", // Group by whatsapp_number
+          ids: { $push: "$_id" },  // Collect all IDs for each whatsapp_number
+          count: { $sum: 1 },      // Count occurrences
+        },
+      },
+      {
+        $match: {
+          count: { $gt: 1 },       // Filter groups with more than one occurrence
+        },
+      },
+    ]);
+
+    if (duplicates.length === 0) {
+      return res.status(200).send({
+        message: "No duplicates found. Table is already clean.",
+      });
+    }
+
+    let deletedCount = 0;
+
+    for (const group of duplicates) {
+      const [keepId, ...deleteIds] = group.ids; // Keep the first ID, delete the rest
+      const result = await CLIENT_COLLECTION.deleteMany({
+        _id: { $in: deleteIds },
+      });
+      deletedCount += result.deletedCount;
+    }
+
+    res.status(200).send({
+      message: "Duplicate removal complete.",
+      totalDuplicatesDeleted: deletedCount,
+    });
+  } catch (error) {
+    console.error("Error deleting duplicates:", error);
+    res.status(500).send({
+      message: "Error deleting duplicates.",
+      error: error.message,
     });
   }
 };
