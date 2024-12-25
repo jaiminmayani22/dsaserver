@@ -79,9 +79,32 @@ async function sendWhatsappTextMessage(to, message) {
                 mobileNumber: data.contacts[0].input,
                 waMessageId: data.messages[0].id,
                 status: data.messages[0].message_status,
-                messageTitle: message
+                messageTitle: message,
             };
-            await MESSAGE_LOG.create(obj);
+
+            const existingLog = await MESSAGE_LOG.findOne({
+                mobileNumber: obj.mobileNumber,
+                waMessageId: obj.waMessageId,
+            });
+
+            if (existingLog) {
+                await MESSAGE_LOG.updateOne(
+                    { _id: existingLog._id },
+                    {
+                        $set: {
+                            status: obj.status,
+                            messageTitle: obj.messageTitle,
+                            updatedAt: new Date(),
+                        },
+                    }
+                );
+            } else {
+                await MESSAGE_LOG.create({
+                    ...obj,
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                });
+            }
         }).catch(err => {
             console.error(CONSTANT.MESSAGE.MESSAGE_NOT_SEND);
             throw err;
@@ -102,14 +125,16 @@ async function updateWhatsappStatuses(data) {
                     for (const status of value.statuses) {
                         try {
                             const reason = status.errors?.[0]?.error_data?.details || status.errors?.[0]?.message || "";
-                            const updatedData = await MESSAGE_LOG.findOneAndUpdate(
-                                { waMessageId: status.id },
+                            const recipientId = status.recipient_id;
+                            const updatedData = await MESSAGE_LOG.updateOne(
+                                { waMessageId: status.id, mobileNumber: recipientId },
                                 {
-                                    status: status.status,
-                                    reason: reason,
-                                    updatedAt: new Date(),
-                                },
-                                { returnDocument: "after" }
+                                    $set: {
+                                        status: status.status,
+                                        reason: reason,
+                                        updatedAt: new Date(),
+                                    },
+                                }
                             );
 
                             if (!updatedData) {

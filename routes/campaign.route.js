@@ -15,5 +15,6 @@ router.post("/campaignAudienceCount", auth, campaignCtrl.campaignAudienceCount);
 
 router.post("/getMessageLog", auth, campaignCtrl.getMessageLog);
 router.post("/getMessagesForCampaign", auth, campaignCtrl.getMessagesForCampaign);
+router.post("/removeDuplicateLogs", auth, campaignCtrl.removeDuplicateLogs);
 
 module.exports = router;

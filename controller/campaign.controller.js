@@ -639,7 +639,10 @@ const sendInstantMessage = async (req, res) => {
         .sort({ updatedAt: -1 });
 
       if (latestLog) {
-        if (!['read', 'sent', 'delivered'].includes(latestLog.status) && latestLog.updatedAt.getTime() > oneHourAgo) {
+        const isStatusInvalid = !['read', 'sent', 'delivered'].includes(latestLog.status);
+        const isWithinLastHour = latestLog.updatedAt.getTime() > oneHourAgo && latestLog.updatedAt.getTime() <= Date.now();
+
+        if (isStatusInvalid && isWithinLastHour) {
           freezedAudience.push(client._id);
         } else {
           mobileNumbers.push(client.whatsapp_number);
@@ -1100,7 +1103,32 @@ const whatsappAPISend = async (messageData, _id, messageType, caption) => {
       msgType: messageType,
       messageTitle: caption,
     };
-    await MESSAGE_LOG.create(obj);
+
+    const existingLog = await MESSAGE_LOG.findOne({
+      camId: obj.camId,
+      mobileNumber: obj.mobileNumber,
+      waMessageId: obj.waMessageId,
+      msgType: obj.msgType,
+    });
+
+    if (existingLog) {
+      await MESSAGE_LOG.updateOne(
+        { _id: existingLog._id },
+        {
+          $set: {
+            status: obj.status,
+            messageTitle: obj.messageTitle,
+            updatedAt: new Date(),
+          },
+        }
+      );
+    } else {
+      await MESSAGE_LOG.create({
+        ...obj,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    }
   } catch (error) {
     console.error(`Failed to send message for campaign ${_id}:`, error.message || error);
   }
@@ -1137,7 +1165,7 @@ exports.getMessagesForCampaign = async (req, res) => {
       },
       {
         $match: {
-          "clientInfo.isDeleted": { $ne: true }, 
+          "clientInfo.isDeleted": { $ne: true },
         },
       },
       {
@@ -1165,6 +1193,60 @@ exports.getMessagesForCampaign = async (req, res) => {
   } catch (error) {
     return res.status(500).json({
       message: error.message || CONSTANT.MESSAGE.ERROR_OCCURRED,
+    });
+  }
+};
+
+exports.removeDuplicateLogs = async (req, res) => {
+  try {
+    const duplicates = await MESSAGE_LOG.aggregate([
+      {
+        $group: {
+          _id: {
+            // status: "$status",
+            camId: "$camId",
+            mobileNumber: "$mobileNumber",
+            // reason: "$reason",
+            // waMessageId: "$waMessageId",
+            // msgType: "$msgType",
+            // isDeleted: "$isDeleted",
+          },
+          ids: { $push: "$_id" },
+          count: { $sum: 1 },
+        },
+      },
+      {
+        $match: {
+          count: { $gt: 1 },
+        },
+      },
+    ]);
+
+    if (duplicates.length === 0) {
+      return res.status(200).send({
+        message: "No duplicates found. Table is already clean.",
+      });
+    }
+
+    let deletedCount = 0;
+
+    for (const group of duplicates) {
+      const [keepId, ...deleteIds] = group.ids;
+      const result = await MESSAGE_LOG.deleteMany({
+        _id: { $in: deleteIds },
+      });
+      deletedCount += result.deletedCount;
+    }
+
+    res.status(200).send({
+      message: "Duplicate removal complete.",
+      totalDuplicatesDeleted: deletedCount,
+    });
+  } catch (error) {
+    console.error("Error deleting duplicates:", error);
+    res.status(500).send({
+      message: "Error deleting duplicates.",
+      error: error.message,
     });
   }
 };
