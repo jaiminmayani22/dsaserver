@@ -1,3 +1,4 @@
+const CAMPAIGN_MODULE = require("../module/campaign.module");
 const MESSAGE_LOG = require("../module/messageLog.module");
 const RECEIVED_MESSAGE = require("../module/receivedMessage.module");
 const CONSTANT = require("../common/constant");
@@ -126,15 +127,10 @@ async function updateWhatsappStatuses(data) {
                         try {
                             const reason = status.errors?.[0]?.error_data?.details || status.errors?.[0]?.message || "";
                             const recipientId = status.recipient_id;
-                            const updatedData = await MESSAGE_LOG.updateOne(
+                            const updatedData = await MESSAGE_LOG.findOneAndUpdate(
                                 { waMessageId: status.id, mobileNumber: `+${recipientId}` },
-                                {
-                                    $set: {
-                                        status: status.status,
-                                        reason: reason,
-                                    },
-                                },
-                                { upsert: false }
+                                { $set: { status: status.status, reason: reason } },
+                                { new: true }
                             );
 
                             if (!updatedData) {
@@ -142,24 +138,48 @@ async function updateWhatsappStatuses(data) {
                                 continue;
                             }
 
-                            if (["read", "accepted", "sent"].includes(status.status)) {
-                                const campaignUpdate = await CAMPAIGN_MODULE.findOneAndUpdate(
-                                    { _id: updatedData.camId },
-                                    { $inc: { receiver: 1 } },
-                                );
+                            if (!updatedData.camId) {
+                                console.error(`camId is missing in MESSAGE_LOG entry for waMessageId: ${status.id}`);
+                                continue;
+                            }
 
-                                if (!campaignUpdate) {
-                                    console.error(`Failed to update CAMPAIGN_MODULE for camId: ${updatedData.camId}`);
+                            if (["read", "accepted", "sent"].includes(status.status)) {
+                                const campaign = await CAMPAIGN_MODULE.findOne({ _id: updatedData.camId });
+
+                                if (!campaign) {
+                                    console.error(`Campaign not found for camId: ${updatedData.camId}`);
                                 } else {
-                                    console.log(`Updated CAMPAIGN_MODULE receiver:`, campaignUpdate.receiver);
+                                    const currentReceiver = parseInt(campaign.receiver, 10) || 0;
+
+                                    const updatedReceiver = (currentReceiver + 1).toString();
+
+                                    const campaignUpdate = await CAMPAIGN_MODULE.findOneAndUpdate(
+                                        { _id: updatedData.camId },
+                                        { receiver: updatedReceiver },
+                                        { new: true }
+                                    );
+
+                                    if (!campaignUpdate) {
+                                        console.error(`Failed to update CAMPAIGN_MODULE for camId: ${updatedData.camId}`);
+                                    } else {
+                                        console.log(`Updated CAMPAIGN_MODULE receiver:`, campaignUpdate.receiver);
+                                    }
                                 }
                             }
 
+
                             if (["read", "failed", "accepted"].includes(status.status)) {
                                 const { camId, mobileNumber } = updatedData;
+
+                                if (!mobileNumber) {
+                                    console.error(`mobileNumber is missing in MESSAGE_LOG entry for camId: ${camId}`);
+                                    continue;
+                                }
+
                                 const sanitizedNumber = mobileNumber.replace('+', '');
                                 const tempImagePath = path.resolve(
-                                    __dirname, "..",
+                                    __dirname,
+                                    "..",
                                     CONSTANT.UPLOAD_DOC_PATH.SCHEDULE_UTILITY_EDITED,
                                     `${camId}_${sanitizedNumber}.jpeg`
                                 );
@@ -189,7 +209,6 @@ async function updateWhatsappStatuses(data) {
     }
 }
 
-// Function to handle the received message and insert into MongoDB
 async function processWhatsappMessages(data) {
     try {
         const receivedMessages = await getAllWhatsappMessages(data);
