@@ -127,14 +127,14 @@ async function updateWhatsappStatuses(data) {
                             const reason = status.errors?.[0]?.error_data?.details || status.errors?.[0]?.message || "";
                             const recipientId = status.recipient_id;
                             const updatedData = await MESSAGE_LOG.updateOne(
-                                { waMessageId: status.id, mobileNumber: recipientId },
+                                { waMessageId: status.id, mobileNumber: `+${recipientId}` },
                                 {
                                     $set: {
                                         status: status.status,
                                         reason: reason,
-                                        updatedAt: new Date(),
                                     },
-                                }
+                                },
+                                { upsert: false }
                             );
 
                             if (!updatedData) {
@@ -146,7 +146,6 @@ async function updateWhatsappStatuses(data) {
                                 const campaignUpdate = await CAMPAIGN_MODULE.findOneAndUpdate(
                                     { _id: updatedData.camId },
                                     { $inc: { receiver: 1 } },
-                                    { returnDocument: "after" }
                                 );
 
                                 if (!campaignUpdate) {

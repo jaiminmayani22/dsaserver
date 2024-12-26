@@ -628,11 +628,13 @@ const sendInstantMessage = async (req, res) => {
   const freezedAudience = [];
   const oneHourAgo = Date.now() - 3600000;
   let clients;
+
   if (freezedSend && freezedSend === 'yes') {
     clients = await CLIENT_MODULE.find({ _id: { $in: freezedAudienceIds }, isDeleted: false });
   } else {
     clients = await CLIENT_MODULE.find({ _id: { $in: audienceIds }, isDeleted: false });
   }
+
   for (const client of clients) {
     if (client.whatsapp_number) {
       const latestLog = await MESSAGE_LOG.findOne({ mobileNumber: client.whatsapp_number, isDeleted: false })
@@ -640,18 +642,20 @@ const sendInstantMessage = async (req, res) => {
 
       if (latestLog) {
         const isStatusInvalid = !['read', 'sent', 'delivered'].includes(latestLog.status);
-        const isWithinLastHour = latestLog.updatedAt.getTime() > oneHourAgo && latestLog.updatedAt.getTime() <= Date.now();
+        const isWithinLastHour =
+          latestLog.updatedAt instanceof Date &&
+          latestLog.updatedAt.getTime() > oneHourAgo &&
+          latestLog.updatedAt.getTime() <= Date.now();
 
         if (isStatusInvalid && isWithinLastHour) {
           freezedAudience.push(client._id);
-        } else {
-          mobileNumbers.push(client.whatsapp_number);
+          continue;
         }
-      } else {
-        mobileNumbers.push(client.whatsapp_number);
       }
+      mobileNumbers.push(client.whatsapp_number);
     }
   }
+
 
   if (freezedAudience.length > 0) {
     await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { freezedAudienceIds: freezedAudience });
@@ -1118,15 +1122,12 @@ const whatsappAPISend = async (messageData, _id, messageType, caption) => {
           $set: {
             status: obj.status,
             messageTitle: obj.messageTitle,
-            updatedAt: new Date(),
           },
         }
       );
     } else {
       await MESSAGE_LOG.create({
-        ...obj,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        ...obj
       });
     }
   } catch (error) {
@@ -1201,15 +1202,13 @@ exports.removeDuplicateLogs = async (req, res) => {
   try {
     const duplicates = await MESSAGE_LOG.aggregate([
       {
+        $sort: { updatedAt: -1 },
+      },
+      {
         $group: {
           _id: {
-            // status: "$status",
             camId: "$camId",
             mobileNumber: "$mobileNumber",
-            // reason: "$reason",
-            // waMessageId: "$waMessageId",
-            // msgType: "$msgType",
-            // isDeleted: "$isDeleted",
           },
           ids: { $push: "$_id" },
           count: { $sum: 1 },
