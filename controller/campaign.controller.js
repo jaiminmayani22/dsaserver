@@ -668,29 +668,38 @@ const sendInstantMessage = async (req, res) => {
   if (messageType === 'marketing' && imageUrl) {
     try {
       await sendMarketingWhatsAppMessages(mobileNumbers, imageUrl, _id, caption, messageType, documentType);
-      if (res) {
-        return res.status(200).json({
-          message: CONSTANT.COLLECTION.CAMPAIGN + CONSTANT.MESSAGE.CREATE_SENT_SUCCESSFULLY,
-        });
-      } else {
-        console.log("Message sent successfully for campaign : ", req.body.name);
-      }
+      return res.status(200).json({
+        message: CONSTANT.COLLECTION.CAMPAIGN + CONSTANT.MESSAGE.CREATE_SENT_SUCCESSFULLY,
+      });
     } catch (error) {
-      return Promise.reject(error);
+      console.error("Error sending WhatsApp messages:", error);
+      return res.status(500).json({
+        message: CONSTANT.COLLECTION.CAMPAIGN + CONSTANT.MESSAGE.CREATE_FAILED,
+        error: error.message,
+      });
     }
   } else if (messageType === 'utility' && imageUrl) {
     const selectedRefTemplate = req.body.selectedRefTemplate;
     try {
-      await sendUtilityWhatsAppMessages(mobileNumbers, imageUrl, _id, caption, selectedRefTemplate, messageType);
-      if (res) {
+      const sendSuccess = await sendUtilityWhatsAppMessages(
+        mobileNumbers,
+        imageUrl,
+        _id,
+        caption,
+        selectedRefTemplate,
+        messageType
+      );
+
+      if (sendSuccess) {
         return res.status(200).json({
           message: CONSTANT.COLLECTION.CAMPAIGN + CONSTANT.MESSAGE.CREATE_SENT_SUCCESSFULLY,
         });
       } else {
-        console.log("Message sent successfully for campaign : ", req.body.name);
+        console.log("Message sent successfully for campaign:", req.body.name);
       }
     } catch (error) {
-      return Promise.reject(error);
+      console.error("Error occurred while sending messages:", error);
+      return res.status(500).json({ error: "Failed to send messages" });
     }
   } else if (!imageUrl && caption) {
     try {
@@ -719,95 +728,19 @@ const stripHtmlTags = (htmlContent) => {
 
 const sendMarketingWhatsAppMessages = async (mobileNumbers, images, _id, caption, messageType, documentType) => {
   try {
-    for (const mobileNumber of mobileNumbers) {
-      try {
-        let messageData;
-
-        if (documentType === "image") {
-          messageData = {
-            messaging_product: "whatsapp",
-            to: `${mobileNumber}`,
-            type: "template",
-            template: {
-              name: CONSTANT.TEMPLATE_NAME.FOR_UTILITY,
-              language: { code: "en" },
-              components: [
-                {
-                  type: "header",
-                  parameters: [{ type: "image", image: { link: images } }],
-                },
-                {
-                  type: "body",
-                  parameters: [{ type: "text", text: caption || "Hello" }],
-                },
-              ],
-            },
-          };
-        } else if (documentType === "video") {
-          messageData = {
-            messaging_product: "whatsapp",
-            to: `${mobileNumber}`,
-            type: "template",
-            template: {
-              name: CONSTANT.TEMPLATE_NAME.FOR_VIDEO,
-              language: { code: "en" },
-              components: [
-                {
-                  type: "header",
-                  parameters: [{ type: "video", video: { link: images } }],
-                },
-                {
-                  type: "body",
-                  parameters: [{ type: "text", text: caption || "Hello" }],
-                },
-              ],
-            },
-          };
-        } else if (documentType === "document") {
-          messageData = {
-            messaging_product: "whatsapp",
-            to: `${mobileNumber}`,
-            type: "template",
-            template: {
-              name: CONSTANT.TEMPLATE_NAME.FOR_DOCUMENT,
-              language: { code: "en" },
-              components: [
-                {
-                  type: "header",
-                  parameters: [{ type: "document", document: { link: images } }],
-                },
-                {
-                  type: "body",
-                  parameters: [{ type: "text", text: caption || "Hello" }],
-                },
-              ],
-            },
-          };
-        } else {
-          messageData = {
-            messaging_product: "whatsapp",
-            to: `${mobileNumber}`,
-            type: "template",
-            template: {
-              name: CONSTANT.TEMPLATE_NAME.FOR_ONLY_TEXT,
-              language: { code: "en" },
-              components: [
-                {
-                  type: "body",
-                  parameters: [{ type: "text", text: caption || "Hello" }],
-                },
-              ],
-            },
-          };
+    await Promise.all(
+      mobileNumbers.map(async (mobileNumber) => {
+        try {
+          const messageData = prepareMessageData(mobileNumber, images, caption, documentType);
+          await whatsappAPISend(messageData, _id, messageType, caption);
+        } catch (error) {
+          console.error(`Failed to send message to ${mobileNumber}:`, error);
         }
-
-        await whatsappAPISend(messageData, _id, messageType, caption);
-      } catch (error) {
-        console.error(`Failed to send message to ${mobileNumber}:`, error);
-      }
-    }
+      })
+    );
   } catch (error) {
     console.error(`Error in sending WhatsApp messages for campaign ${_id}:`, error);
+    throw error;
   } finally {
     try {
       await updateCampaignStatus(_id, "completed");
@@ -815,6 +748,44 @@ const sendMarketingWhatsAppMessages = async (mobileNumbers, images, _id, caption
       console.error(`Failed to update campaign status for campaign ${_id}:`, updateError);
     }
   }
+};
+
+const prepareMessageData = (mobileNumber, images, caption, documentType) => {
+  const baseTemplate = {
+    messaging_product: "whatsapp",
+    to: mobileNumber,
+    type: "template",
+    template: {
+      language: { code: "en" },
+      components: [
+        { type: "body", parameters: [{ type: "text", text: caption || "Hello" }] },
+      ],
+    },
+  };
+
+  if (documentType === "image") {
+    baseTemplate.template.name = CONSTANT.TEMPLATE_NAME.FOR_UTILITY;
+    baseTemplate.template.components.unshift({
+      type: "header",
+      parameters: [{ type: "image", image: { link: images } }],
+    });
+  } else if (documentType === "video") {
+    baseTemplate.template.name = CONSTANT.TEMPLATE_NAME.FOR_VIDEO;
+    baseTemplate.template.components.unshift({
+      type: "header",
+      parameters: [{ type: "video", video: { link: images } }],
+    });
+  } else if (documentType === "document") {
+    baseTemplate.template.name = CONSTANT.TEMPLATE_NAME.FOR_DOCUMENT;
+    baseTemplate.template.components.unshift({
+      type: "header",
+      parameters: [{ type: "document", document: { link: images } }],
+    });
+  } else {
+    baseTemplate.template.name = CONSTANT.TEMPLATE_NAME.FOR_ONLY_TEXT;
+  }
+
+  return baseTemplate;
 };
 
 const sendTextWhatsAppMessages = async (mobileNumbers, _id, caption, messageType) => {
@@ -1070,14 +1041,11 @@ const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, 
         console.error(`Failed to process mobile number ${mobileNumber}:`, error);
       }
     }
+    await updateCampaignStatus(_id, "completed");
+    return true; // Success
   } catch (error) {
     console.error(`Failed to send WhatsApp messages for campaign ${_id}:`, error);
-  } finally {
-    try {
-      await updateCampaignStatus(_id, "completed");
-    } catch (updateError) {
-      console.error(`Failed to update campaign status for campaign ${_id}:`, updateError);
-    }
+    throw error; // Propagate the error
   }
 };
 
