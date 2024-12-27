@@ -875,68 +875,59 @@ const editUtilityImage = async ({
 
       if (type === 'text') {
         let updatedContent = content;
-        if (/Name/i.test(content)) {
-          updatedContent = updatedContent.replace(/Name/i, username ? username : '');
-        }
-        if (/Number/i.test(content)) {
-          updatedContent = updatedContent.replace(/Number/i, number ? number : '');
-        }
-        if (/instagramId/i.test(content)) {
-          updatedContent = updatedContent.replace(/instagramId/i, instagramID ? instagramID : '');
-        }
-        if (/facebookId/i.test(content)) {
-          updatedContent = updatedContent.replace(/facebookId/i, facebookID ? facebookID : '');
-        }
-        if (/company_name/i.test(content)) {
-          updatedContent = updatedContent.replace(/company_name/i, company_name ? company_name : '');
-        }
-        if (/email/i.test(content)) {
-          updatedContent = updatedContent.replace(/email/i, email ? email : '');
-        }
-        if (/city/i.test(content)) {
-          updatedContent = updatedContent.replace(/city/i, city ? city : '');
-        }
-        if (/district/i.test(content)) {
-          updatedContent = updatedContent.replace(/district/i, district ? district : '');
-        }
-        if (/address/i.test(content)) {
-          updatedContent = updatedContent.replace(/address/i, address ? address : '');
-        }
-        if (/Website/i.test(content)) {
-          updatedContent = updatedContent.replace(/Website/i, userWebsite ? userWebsite : '');
+        const replacements = {
+          name: username || '',
+          number: number || '',
+          instagramId: instagramID || '',
+          facebookId: facebookID || '',
+          company_name: company_name || '',
+          email: email || '',
+          city: city || '',
+          district: district || '',
+          address: address || '',
+          website: userWebsite || '',
+        };
+
+        for (const [key, value] of Object.entries(replacements)) {
+          updatedContent = updatedContent.replace(new RegExp(key, 'i'), value);
         }
 
         if (/Logo/i.test(content)) {
           if (logoImage) {
-            const logoResponse = await fetch(logoImage);
-            if (logoResponse.ok) {
-              const logoBuffer = await logoResponse.buffer();
-              const logoImageLoaded = await loadImage(logoBuffer);
+            try {
+              const logoResponse = await fetch(logoImage);
+              if (logoResponse.ok) {
+                const logoBuffer = await logoResponse.buffer();
+                const logoImageLoaded = await loadImage(logoBuffer);
 
-              const originalWidth = logoImageLoaded.width;
-              const originalHeight = logoImageLoaded.height;
+                const originalWidth = logoImageLoaded.width;
+                const originalHeight = logoImageLoaded.height;
 
-              let logoWidth, logoHeight;
-              if (originalWidth > originalHeight) {
-                logoWidth = parseFloat(fontSize);
-                logoHeight = (originalHeight / originalWidth) * logoWidth;
-              } else {
-                logoHeight = parseFloat(fontSize);
-                logoWidth = (originalWidth / originalHeight) * logoHeight;
+                let logoWidth, logoHeight;
+                if (originalWidth > originalHeight) {
+                  logoWidth = parseFloat(fontSize);
+                  logoHeight = (originalHeight / originalWidth) * logoWidth;
+                } else {
+                  logoHeight = parseFloat(fontSize);
+                  logoWidth = (originalWidth / originalHeight) * logoHeight;
+                }
+                if (logoHeight < 140) {
+                  logoHeight = 140;
+                  logoWidth = (originalWidth / originalHeight) * logoHeight;
+                }
+
+                const centerX = x;
+                const centerY = y;
+                const drawX = centerX - logoWidth / 2;
+                const drawY = centerY - logoHeight / 2;
+                ctx.drawImage(logoImageLoaded, drawX, drawY, logoWidth, logoHeight);
+                continue; // Skip further processing for logo
               }
-              if (logoHeight < 140) {
-                logoHeight = 140;
-                logoWidth = (originalWidth / originalHeight) * logoHeight;
-              }
-              const centerX = x;
-              const centerY = y;
-              const drawX = centerX - logoWidth / 2;
-              const drawY = centerY - logoHeight / 2;
-              ctx.drawImage(logoImageLoaded, drawX, drawY, logoWidth, logoHeight);
-              continue;
-            };
+            } catch (error) {
+              console.error('Error processing logo image:', error);
+            }
           } else {
-            updatedContent = updatedContent.replace(/logo/i, '');
+            updatedContent = updatedContent.replace(/Logo/i, '');
           }
         }
 
