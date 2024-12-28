@@ -166,34 +166,35 @@ async function updateWhatsappStatuses(data) {
                                     }
                                 }
                             }
+                            
+                            if (updatedData?.msgType === "utility") {
+                                if (["read", "failed", "accepted"].includes(status.status)) {
+                                    const { camId, mobileNumber } = updatedData;
 
+                                    if (!mobileNumber) {
+                                        console.error(`mobileNumber is missing in MESSAGE_LOG entry for camId: ${camId}`);
+                                        continue;
+                                    }
 
-                            if (["read", "failed", "accepted"].includes(status.status)) {
-                                const { camId, mobileNumber } = updatedData;
+                                    const sanitizedNumber = mobileNumber.replace('+', '');
+                                    const tempImagePath = path.resolve(
+                                        __dirname,
+                                        "..",
+                                        CONSTANT.UPLOAD_DOC_PATH.SCHEDULE_UTILITY_EDITED,
+                                        `${camId}_${sanitizedNumber}.jpeg`
+                                    );
 
-                                if (!mobileNumber) {
-                                    console.error(`mobileNumber is missing in MESSAGE_LOG entry for camId: ${camId}`);
-                                    continue;
-                                }
-
-                                const sanitizedNumber = mobileNumber.replace('+', '');
-                                const tempImagePath = path.resolve(
-                                    __dirname,
-                                    "..",
-                                    CONSTANT.UPLOAD_DOC_PATH.SCHEDULE_UTILITY_EDITED,
-                                    `${camId}_${sanitizedNumber}.jpeg`
-                                );
-
-                                if (fs.existsSync(tempImagePath)) {
-                                    fs.unlink(tempImagePath, (err) => {
-                                        if (err) {
-                                            console.error(`Failed to delete image: ${tempImagePath}`, err);
-                                        } else {
-                                            console.log(`Successfully deleted image: ${tempImagePath}`);
-                                        }
-                                    });
-                                } else {
-                                    console.warn(`File does not exist: ${tempImagePath}`);
+                                    if (fs.existsSync(tempImagePath)) {
+                                        fs.unlink(tempImagePath, (err) => {
+                                            if (err) {
+                                                console.error(`Failed to delete image: ${tempImagePath}`, err);
+                                            } else {
+                                                console.log(`Successfully deleted image: ${tempImagePath}`);
+                                            }
+                                        });
+                                    } else {
+                                        console.warn(`File does not exist: ${tempImagePath}`);
+                                    }
                                 }
                             }
                         } catch (error) {

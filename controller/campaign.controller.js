@@ -656,7 +656,6 @@ const sendInstantMessage = async (req, res) => {
     }
   }
 
-
   if (freezedAudience.length > 0) {
     await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { freezedAudienceIds: freezedAudience });
   } else {
@@ -728,16 +727,14 @@ const stripHtmlTags = (htmlContent) => {
 
 const sendMarketingWhatsAppMessages = async (mobileNumbers, images, _id, caption, messageType, documentType) => {
   try {
-    await Promise.all(
-      mobileNumbers.map(async (mobileNumber) => {
-        try {
-          const messageData = prepareMessageData(mobileNumber, images, caption, documentType);
-          await whatsappAPISend(messageData, _id, messageType, caption);
-        } catch (error) {
-          console.error(`Failed to send message to ${mobileNumber}:`, error);
-        }
-      })
-    );
+    for (const mobileNumber of mobileNumbers) {
+      try {
+        const messageData = prepareMessageData(mobileNumber, images, caption, documentType);
+        await whatsappAPISend(messageData, _id, messageType, caption);
+      } catch (error) {
+        console.error(`Failed to send message to ${mobileNumber}:`, error);
+      }
+    }
   } catch (error) {
     console.error(`Error in sending WhatsApp messages for campaign ${_id}:`, error);
     throw error;
