@@ -832,6 +832,9 @@ const editUtilityImage = async ({
   userWebsite,
   selectedRefTemplate,
   imagePath,
+  city,
+  district,
+  address,
   _id }) => {
 
   try {
@@ -1004,6 +1007,9 @@ const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, 
           userWebsite: user[0].website,
           selectedRefTemplate: refTemplate,
           imagePath: images,
+          city: user[0].city,
+          district: user[0].district,
+          address: user[0].address,
           _id: _id,
         });
 
