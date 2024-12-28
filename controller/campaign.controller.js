@@ -505,11 +505,7 @@ exports.getCampaignById = async (req, res) => {
 exports.deleteCampaign = async (req, res) => {
   try {
     const { id } = req.body;
-    const campaign = await CAMPAIGN_MODULE.findByIdAndUpdate(
-      id,
-      { isDeleted: true },
-      { new: true }
-    );
+    const campaign = await CAMPAIGN_MODULE.deleteOne({ _id: id });
     if (!campaign) {
       return res.status(404).send({ message: CONSTANT.MESSAGE.CAMPAIGN_NOT_FOUND });
     }
@@ -861,46 +857,46 @@ const editUtilityImage = async ({
     const layers = selectedRefTemplate.layers;
 
     for (const layer of layers) {
-      const { type, content, x, y, fontSize, fontWeight, fontStyle, fontFamily, textDecoration, fillColor } = layer;
+      const {
+        type,
+        content,
+        x,
+        y,
+        fontSize = '24px', // Default font size
+        fontWeight = 'normal', // Default font weight
+        fontStyle = 'normal', // Default font style
+        fontFamily = 'Times New Roman', // Default font family
+        textDecoration = 'none', // Default text decoration
+        fillColor = 'black', // Default text color
+        textAlign = 'center', // Default text alignment
+        textBaseline = 'center', // Default text baseline
+      } = layer;
 
       if (type === 'text') {
         let updatedContent = content;
-        if (/name/i.test(content)) {
-          updatedContent = updatedContent.replace(/name/i, username ? username : '');
-        }
-        if (/number/i.test(content)) {
-          updatedContent = updatedContent.replace(/number/i, number ? number : '');
-        }
-        if (/instagramId/i.test(content)) {
-          updatedContent = updatedContent.replace(/instagramId/i, instagramID ? instagramID : '');
-        }
-        if (/facebookId/i.test(content)) {
-          updatedContent = updatedContent.replace(/facebookId/i, facebookID ? facebookID : '');
-        }
-        if (/company_name/i.test(content)) {
-          updatedContent = updatedContent.replace(/company_name/i, company_name ? company_name : '');
-        }
-        if (/email/i.test(content)) {
-          updatedContent = updatedContent.replace(/email/i, email ? email : '');
-        }
-        if (/city/i.test(content)) {
-          updatedContent = updatedContent.replace(/city/i, city ? city : '');
-        }
-        if (/district/i.test(content)) {
-          updatedContent = updatedContent.replace(/district/i, district ? district : '');
-        }
-        if (/address/i.test(content)) {
-          updatedContent = updatedContent.replace(/address/i, address ? address : '');
-        }
-        if (/website/i.test(content)) {
-          updatedContent = updatedContent.replace(/website/i, userWebsite ? userWebsite : '');
+
+        const replacements = {
+          name: username || '',
+          number: number || '',
+          instagramId: instagramID || '',
+          facebookId: facebookID || '',
+          company_name: company_name || '',
+          email: email || '',
+          city: city || '',
+          district: district || '',
+          address: address || '',
+          website: userWebsite || '',
+        };
+
+        for (const [key, value] of Object.entries(replacements)) {
+          const regex = new RegExp(key, 'i');
+          updatedContent = updatedContent.replace(regex, value);
         }
 
         if (/logo/i.test(content)) {
           if (logoImage) {
             try {
               const logoResponse = await fetch(logoImage);
-
               if (logoResponse.ok) {
                 const logoBuffer = await logoResponse.buffer();
                 const logoImageLoaded = await loadImage(logoBuffer);
@@ -908,7 +904,6 @@ const editUtilityImage = async ({
                 if (logoImageLoaded) {
                   const originalWidth = logoImageLoaded.width;
                   const originalHeight = logoImageLoaded.height;
-
                   let logoWidth, logoHeight;
 
                   if (originalWidth > originalHeight) {
@@ -920,39 +915,40 @@ const editUtilityImage = async ({
                   }
 
                   if (logoHeight !== 140) {
-                    logoHeight = 140;
+                    logoHeight = 160;
                     logoWidth = (originalWidth / originalHeight) * logoHeight;
                   }
 
-                  const centerX = x;
-                  const centerY = y;
-                  const drawX = centerX - logoWidth / 2;
-                  const drawY = centerY - logoHeight / 2;
+                  const drawX = x - logoWidth / 2;
+                  const drawY = y - logoHeight / 2;
 
                   ctx.drawImage(logoImageLoaded, drawX, drawY, logoWidth, logoHeight);
+
+                  updatedContent = updatedContent.replace(/logo/i, '');
                 }
               }
             } catch (error) {
-              console.error("Error loading logo image:", error);
+              console.error('Error loading logo image:', error);
             }
           } else {
-            updatedContent = updatedContent.replace(/Logo/i, '');
+            updatedContent = updatedContent.replace(/logo/i, '');
           }
         }
 
         ctx.font = `${fontWeight} ${fontStyle} ${parseFloat(fontSize)}px ${fontFamily}`;
         ctx.fillStyle = fillColor;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'center';
+        ctx.textAlign = textAlign;
+        ctx.textBaseline = textBaseline;
 
-        if (updatedContent !== null) {
+        if (updatedContent) {
           if (textDecoration === 'underline') {
             const textWidth = ctx.measureText(stripHtmlTags(updatedContent)).width;
             const lineHeight = parseFloat(fontSize);
             ctx.fillText(stripHtmlTags(updatedContent), x, y);
+
             ctx.beginPath();
-            ctx.moveTo(x, y + lineHeight);
-            ctx.lineTo(x + textWidth, y + lineHeight);
+            ctx.moveTo(x - textWidth / 2, y + lineHeight / 2);
+            ctx.lineTo(x + textWidth / 2, y + lineHeight / 2);
             ctx.strokeStyle = 'black';
             ctx.lineWidth = 1;
             ctx.stroke();
