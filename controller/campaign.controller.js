@@ -860,7 +860,6 @@ const editUtilityImage = async ({
   email,
   instagramID,
   facebookID,
-  profilePicUrl,
   logoImage,
   userWebsite,
   selectedRefTemplate,
@@ -884,15 +883,6 @@ const editUtilityImage = async ({
       throw new Error('Failed to load main image: ' + err.message);
     }
 
-    // let profileImageBuffer;
-    // try {
-    //   const response = await fetch(profilePicUrl);
-    //   if (!response.ok) throw new Error('Failed to fetch profile picture');
-    //   profileImageBuffer = await response.buffer();
-    // } catch (err) {
-    //   throw new Error('Failed to load profile picture: ' + err.message);
-    // }
-
     const canvas = createCanvas(mainImage.width, mainImage.height);
     const ctx = canvas.getContext('2d');
     ctx.drawImage(mainImage, 0, 0, mainImage.width, mainImage.height);
@@ -904,11 +894,11 @@ const editUtilityImage = async ({
 
       if (type === 'text') {
         let updatedContent = content;
-        if (/Name/i.test(content)) {
-          updatedContent = updatedContent.replace(/Name/i, username ? username : '');
+        if (/name/i.test(content)) {
+          updatedContent = updatedContent.replace(/name/i, username ? username : '');
         }
-        if (/Number/i.test(content)) {
-          updatedContent = updatedContent.replace(/Number/i, number ? number : '');
+        if (/number/i.test(content)) {
+          updatedContent = updatedContent.replace(/number/i, number ? number : '');
         }
         if (/instagramId/i.test(content)) {
           updatedContent = updatedContent.replace(/instagramId/i, instagramID ? instagramID : '');
@@ -931,39 +921,49 @@ const editUtilityImage = async ({
         if (/address/i.test(content)) {
           updatedContent = updatedContent.replace(/address/i, address ? address : '');
         }
-        if (/Website/i.test(content)) {
-          updatedContent = updatedContent.replace(/Website/i, userWebsite ? userWebsite : '');
+        if (/website/i.test(content)) {
+          updatedContent = updatedContent.replace(/website/i, userWebsite ? userWebsite : '');
         }
 
-        if (/Logo/i.test(content)) {
+        if (/logo/i.test(content)) {
           if (logoImage) {
-            const logoResponse = await fetch(logoImage);
-            if (logoResponse.ok) {
-              const logoBuffer = await logoResponse.buffer();
-              const logoImageLoaded = await loadImage(logoBuffer);
+            try {
+              const logoResponse = await fetch(logoImage);
 
-              const originalWidth = logoImageLoaded.width;
-              const originalHeight = logoImageLoaded.height;
+              if (logoResponse.ok) {
+                const logoBuffer = await logoResponse.buffer();
+                const logoImageLoaded = await loadImage(logoBuffer);
 
-              let logoWidth, logoHeight;
-              if (originalWidth > originalHeight) {
-                logoWidth = parseFloat(fontSize);
-                logoHeight = (originalHeight / originalWidth) * logoWidth;
-              } else {
-                logoHeight = parseFloat(fontSize);
-                logoWidth = (originalWidth / originalHeight) * logoHeight;
+                if (logoImageLoaded) {
+                  const originalWidth = logoImageLoaded.width;
+                  const originalHeight = logoImageLoaded.height;
+
+                  let logoWidth, logoHeight;
+
+                  if (originalWidth > originalHeight) {
+                    logoWidth = parseFloat(fontSize);
+                    logoHeight = (originalHeight / originalWidth) * logoWidth;
+                  } else {
+                    logoHeight = parseFloat(fontSize);
+                    logoWidth = (originalWidth / originalHeight) * logoHeight;
+                  }
+
+                  if (logoHeight !== 140) {
+                    logoHeight = 140;
+                    logoWidth = (originalWidth / originalHeight) * logoHeight;
+                  }
+
+                  const centerX = x;
+                  const centerY = y;
+                  const drawX = centerX - logoWidth / 2;
+                  const drawY = centerY - logoHeight / 2;
+
+                  ctx.drawImage(logoImageLoaded, drawX, drawY, logoWidth, logoHeight);
+                }
               }
-              if (logoHeight < 140) {
-                logoHeight = 140;
-                logoWidth = (originalWidth / originalHeight) * logoHeight;
-              }
-              const centerX = x;
-              const centerY = y;
-              const drawX = centerX - logoWidth / 2;
-              const drawY = centerY - logoHeight / 2;
-              ctx.drawImage(logoImageLoaded, drawX, drawY, logoWidth, logoHeight);
-              continue;
-            };
+            } catch (error) {
+              console.error("Error loading logo image:", error);
+            }
           } else {
             updatedContent = updatedContent.replace(/logo/i, '');
           }
@@ -974,18 +974,20 @@ const editUtilityImage = async ({
         ctx.textAlign = 'center';
         ctx.textBaseline = 'center';
 
-        if (textDecoration === 'underline') {
-          const textWidth = ctx.measureText(stripHtmlTags(updatedContent)).width;
-          const lineHeight = parseFloat(fontSize);
-          ctx.fillText(stripHtmlTags(updatedContent), x, y);
-          ctx.beginPath();
-          ctx.moveTo(x, y + lineHeight);
-          ctx.lineTo(x + textWidth, y + lineHeight);
-          ctx.strokeStyle = 'black';
-          ctx.lineWidth = 1;
-          ctx.stroke();
-        } else {
-          ctx.fillText(stripHtmlTags(updatedContent), x, y);
+        if (updatedContent !== null) {
+          if (textDecoration === 'underline') {
+            const textWidth = ctx.measureText(stripHtmlTags(updatedContent)).width;
+            const lineHeight = parseFloat(fontSize);
+            ctx.fillText(stripHtmlTags(updatedContent), x, y);
+            ctx.beginPath();
+            ctx.moveTo(x, y + lineHeight);
+            ctx.lineTo(x + textWidth, y + lineHeight);
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+          } else {
+            ctx.fillText(stripHtmlTags(updatedContent), x, y);
+          }
         }
       }
     }
