@@ -134,12 +134,12 @@ async function updateWhatsappStatuses(data) {
                             );
 
                             if (!updatedData) {
-                                console.error(`No MESSAGE_LOG entry found for waMessageId: ${status.id}`);
+                                console.log(`No MESSAGE_LOG entry found for waMessageId: ${status.id}`);
                                 continue;
                             }
 
                             if (!updatedData.camId) {
-                                console.error(`camId is missing in MESSAGE_LOG entry for waMessageId: ${status.id}`);
+                                console.log(`camId is missing in MESSAGE_LOG entry for waMessageId: ${status.id}`);
                                 continue;
                             }
 
@@ -147,7 +147,7 @@ async function updateWhatsappStatuses(data) {
                                 const campaign = await CAMPAIGN_MODULE.findOne({ _id: updatedData.camId });
 
                                 if (!campaign) {
-                                    console.error(`Campaign not found for camId: ${updatedData.camId}`);
+                                    console.log(`Campaign not found for camId: ${updatedData.camId}`);
                                 } else {
                                     const currentReceiver = parseInt(campaign.receiver, 10) || 0;
                                     const updatedReceiver = (currentReceiver + 1).toString();
@@ -158,7 +158,7 @@ async function updateWhatsappStatuses(data) {
                                     );
 
                                     if (!campaignUpdate) {
-                                        console.error(`Failed to update CAMPAIGN_MODULE for camId: ${updatedData.camId}`);
+                                        console.log(`Failed to update CAMPAIGN_MODULE for camId: ${updatedData.camId}`);
                                     } else {
                                         console.log(`Updated CAMPAIGN_MODULE receiver:`, campaignUpdate.receiver);
                                     }
@@ -189,20 +189,19 @@ async function updateWhatsappStatuses(data) {
                                             }
                                         });
                                     } else {
-                                        console.warn(`File does not exist: ${tempImagePath}`);
+                                        console.log(`File does not exist: ${tempImagePath}`);
                                     }
                                 }
                             }
                         } catch (error) {
-                            console.error(`An error occurred while processing status:`, error);
+                            console.log(`An error occurred while processing status:`, error);
                         }
                     }
                 }
             }
         }
     } catch (error) {
-        console.error('Error updating WhatsApp statuses:', error);
-        throw error;
+        console.log('Error updating WhatsApp statuses:', error);
     }
 }
 
@@ -236,7 +235,6 @@ async function processWhatsappMessages(data) {
         }
     } catch (error) {
         console.error('Error processing WhatsApp messages:', error);
-        throw error;
     }
 }
 

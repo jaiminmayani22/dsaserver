@@ -444,14 +444,43 @@ exports.getAllCampaigns = async (req, res) => {
     });
   } else {
     try {
-      await CAMPAIGN_MODULE.find({ isDeleted: false }).then((response) => {
-        return res.status(200).send(response)
-      })
-        .catch((err) => {
-          return res.status(404).send({
-            message: err.message || CONSTANT.MESSAGE.ERROR_OCCURRED,
-          });
-        });
+      const campaigns = await CAMPAIGN_MODULE.aggregate([
+        {
+          $match: { isDeleted: false },
+        },
+        {
+          $lookup: {
+            from: "messagelog",
+            let: { campaignId: "$_id" },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ["$camId", { $toString: "$$campaignId" }] },
+                      { $in: ["$status", ["sent", "delivered", "read"]] },
+                      { $eq: ["$isDeleted", false] },
+                    ],
+                  },
+                },
+              },
+            ],
+            as: "logs",
+          },
+        },
+        {
+          $addFields: {
+            successMessages: { $size: "$logs" },
+          },
+        },
+        {
+          $project: {
+            logs: 0,
+          },
+        },
+      ]);
+
+      return res.status(200).send(campaigns);
     } catch (err) {
       return res.status(500).send({
         message: err.message || CONSTANT.MESSAGE.ERROR_OCCURRED,
@@ -659,6 +688,7 @@ const sendInstantMessage = async (req, res) => {
   }
 
   const imageUrl = document.url;
+  await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { status: "processing" }, { new: true });
 
   if (messageType === 'marketing' && imageUrl) {
     try {
@@ -668,8 +698,9 @@ const sendInstantMessage = async (req, res) => {
       });
     } catch (error) {
       console.error("Error sending WhatsApp messages:", error);
+      await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { status: "" }, { new: true });
       return res.status(500).json({
-        message: CONSTANT.COLLECTION.CAMPAIGN + CONSTANT.MESSAGE.CREATE_FAILED,
+        message: CONSTANT.COLLECTION.CAMPAIGN + CONSTANT.MESSAGE.SENT_FAILED,
         error: error.message,
       });
     }
@@ -693,8 +724,12 @@ const sendInstantMessage = async (req, res) => {
         console.log("Message sent successfully for campaign:", req.body.name);
       }
     } catch (error) {
+      await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { status: "" }, { new: true });
       console.error("Error occurred while sending messages:", error);
-      return res.status(500).json({ error: "Failed to send messages" });
+      return res.status(500).json({
+        message: CONSTANT.COLLECTION.CAMPAIGN + CONSTANT.MESSAGE.SENT_FAILED,
+        error: error.message,
+      });
     }
   } else if (!imageUrl && caption) {
     try {
@@ -707,14 +742,22 @@ const sendInstantMessage = async (req, res) => {
         console.log("Message sent successfully for campaign : ", req.body.name);
       }
     } catch (error) {
-      return Promise.reject(error);
+      await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { status: "" }, { new: true });
+      return res.status(500).json({
+        message: CONSTANT.COLLECTION.CAMPAIGN + CONSTANT.MESSAGE.SENT_FAILED,
+        error: error.message,
+      });
     }
   };
 };
 exports.sendMessage = sendInstantMessage;
 
 const updateCampaignStatus = async (_id, status) => {
-  await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { status: status });
+  try {
+    await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { status: status }, { new: true });
+  } catch (updateError) {
+    console.log(`Failed to update status for campaign ${_id} : `, updateError);
+  }
 };
 
 const stripHtmlTags = (htmlContent) => {
@@ -728,17 +771,16 @@ const sendMarketingWhatsAppMessages = async (mobileNumbers, images, _id, caption
         const messageData = prepareMessageData(mobileNumber, images, caption, documentType);
         await whatsappAPISend(messageData, _id, messageType, caption);
       } catch (error) {
-        console.error(`Failed to send message to ${mobileNumber}:`, error);
+        console.log(`Failed to send message to ${mobileNumber} : `, error);
       }
-    }
+    };
   } catch (error) {
-    console.error(`Error in sending WhatsApp messages for campaign ${_id}:`, error);
-    throw error;
+    console.log(`Error in sending WhatsApp messages for campaign ${_id} : `, error);
   } finally {
     try {
       await updateCampaignStatus(_id, "completed");
     } catch (updateError) {
-      console.error(`Failed to update campaign status for campaign ${_id}:`, updateError);
+      console.log(`Failed to update campaign status for campaign ${_id} : `, updateError);
     }
   }
 };
@@ -746,6 +788,7 @@ const sendMarketingWhatsAppMessages = async (mobileNumbers, images, _id, caption
 const prepareMessageData = (mobileNumber, images, caption, documentType) => {
   const baseTemplate = {
     messaging_product: "whatsapp",
+    recepient_type: "individual",
     to: mobileNumber,
     type: "template",
     template: {
@@ -777,7 +820,6 @@ const prepareMessageData = (mobileNumber, images, caption, documentType) => {
   } else {
     baseTemplate.template.name = CONSTANT.TEMPLATE_NAME.FOR_ONLY_TEXT;
   }
-
   return baseTemplate;
 };
 
@@ -787,6 +829,7 @@ const sendTextWhatsAppMessages = async (mobileNumbers, _id, caption, messageType
       try {
         const messageData = {
           messaging_product: "whatsapp",
+          recepient_type: "individual",
           to: `${mobileNumber}`,
           type: "template",
           template: {
@@ -803,16 +846,16 @@ const sendTextWhatsAppMessages = async (mobileNumbers, _id, caption, messageType
 
         await whatsappAPISend(messageData, _id, messageType, caption);
       } catch (error) {
-        console.error(`Failed to send message to ${mobileNumber}:`, error);
+        console.log(`Failed to send message to ${mobileNumber}:`, error);
       }
     }
   } catch (error) {
-    console.error(`Error in sending WhatsApp messages for campaign ${_id}:`, error);
+    console.log(`Error in sending WhatsApp messages for campaign ${_id}:`, error);
   } finally {
     try {
       await updateCampaignStatus(_id, "completed");
     } catch (updateError) {
-      console.error(`Failed to update campaign status for campaign ${_id}:`, updateError);
+      console.log(`Failed to update campaign status for campaign ${_id}:`, updateError);
     }
   }
 };
@@ -967,12 +1010,12 @@ const editUtilityImage = async ({
     const tempImagePath = path.join(uploadPath, `${_id}_${sanitizedNumber}.jpeg`);
     const buffer = canvas.toBuffer('image/jpeg');
     if (buffer.length === 0) {
-      throw new Error('The buffer is empty, cannot write to file.');
+      console.log('The buffer is empty, cannot write to file.');
     }
     fs.writeFileSync(tempImagePath, buffer);
     return tempImagePath;
   } catch (err) {
-    throw new Error('Failed to process image: ' + err.message);
+    console.log('Failed to process image: ' + err.message);
   }
 };
 
@@ -980,14 +1023,14 @@ const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, 
   try {
     const refTemplate = await REF_TEMPLATE_MODULE.findById(selectedRefTemplate);
     if (!refTemplate) {
-      throw new Error("Template not found");
+      console.log("Template not found");
     }
 
     for (const mobileNumber of mobileNumbers) {
       try {
         const user = await CLIENT_MODULE.find({ whatsapp_number: mobileNumber });
         if (!user || user.length === 0) {
-          console.error(`User not found for mobile number: ${mobileNumber}`);
+          console.log(`User not found for mobile number: ${mobileNumber}`);
           continue;
         }
 
@@ -1039,14 +1082,13 @@ const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, 
 
         await whatsappAPISend(messageData, _id, messageType, caption);
       } catch (error) {
-        console.error(`Failed to process mobile number ${mobileNumber}:`, error);
+        console.log(`Failed to process mobile number ${mobileNumber}:`, error);
       }
     }
     await updateCampaignStatus(_id, "completed");
-    return true; // Success
+    return true;
   } catch (error) {
-    console.error(`Failed to send WhatsApp messages for campaign ${_id}:`, error);
-    throw error; // Propagate the error
+    console.log(`Failed to send WhatsApp messages for campaign ${_id}:`, error);
   }
 };
 
@@ -1062,10 +1104,9 @@ const whatsappAPISend = async (messageData, _id, messageType, caption) => {
     });
 
     const data = await response.json();
-
     if (!response.ok) {
-      console.error(`WhatsApp API Error: ${data.message || 'Unknown error'}`);
-      throw new Error(data.message || 'Failed to send WhatsApp message');
+      console.log(`WhatsApp API Error : ${data.message || 'Unknown error'}`);
+      return false;
     }
 
     const obj = {
@@ -1084,23 +1125,32 @@ const whatsappAPISend = async (messageData, _id, messageType, caption) => {
       msgType: obj.msgType,
     });
 
-    if (existingLog) {
-      await MESSAGE_LOG.updateOne(
-        { _id: existingLog._id },
-        {
-          $set: {
-            status: obj.status,
-            messageTitle: obj.messageTitle,
+    try {
+      if (existingLog) {
+        await MESSAGE_LOG.updateOne(
+          { _id: existingLog._id },
+          {
+            $set: {
+              status: obj.status,
+              messageTitle: obj.messageTitle,
+            },
           },
-        }
-      );
-    } else {
-      await MESSAGE_LOG.create({
-        ...obj
-      });
+          { new: true }
+        );
+      } else {
+        await MESSAGE_LOG.create({
+          ...obj
+        });
+      }
+      await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { $inc: { process: 1 } }, { new: true });
+      return true;
+    } catch (error) {
+      console.log("Error updating or creating message log : ", error.message);
+      return false;
     }
   } catch (error) {
-    console.error(`Failed to send message for campaign ${_id}:`, error.message || error);
+    console.log(`Failed to send message for campaign ${_id} : `, error.message || error);
+    return false;
   }
 };
 
@@ -1211,7 +1261,7 @@ exports.removeDuplicateLogs = async (req, res) => {
       totalDuplicatesDeleted: deletedCount,
     });
   } catch (error) {
-    console.error("Error deleting duplicates:", error);
+    console.log("Error deleting duplicates:", error);
     res.status(500).send({
       message: "Error deleting duplicates.",
       error: error.message,

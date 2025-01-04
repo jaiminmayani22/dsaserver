@@ -7,6 +7,7 @@ const CampaignSchema = mongoose.Schema(
         type: { type: String, default: CONSTANT.NULL_STRING },
         schedule: { type: String, default: CONSTANT.NULL_STRING },
         status: { type: String, default: CONSTANT.NULL_STRING },
+        process: { type: Number, default: 0 },
         receiver: { type: String, default: CONSTANT.NULL_STRING },
         audience: { type: String, default: CONSTANT.NULL_STRING },
         audienceIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'client' }],
