@@ -1460,7 +1460,7 @@ exports.createGroup = async (req, res) => {
 };
 
 exports.addContactsToGroup = async (req, res) => {
-  const { Ids, groupId } = req.body;
+  const { Ids, numbers, groupId } = req.body;
 
   try {
     const newGroupId = groupId.trim();
@@ -1468,33 +1468,63 @@ exports.addContactsToGroup = async (req, res) => {
     const name = await GROUP_COLLECTION.findOne({ groupId: newGroupId, isDeleted: false });
     const results = [];
 
-    for (const id of Ids) {
-      const user = await CLIENT_COLLECTION.findOne({ _id: id, isDeleted: false });
-      if (!user) continue;
-      const existingGroupIds = user.groupId && user.groupId !== CONSTANT.NULL_STRING
-        ? user.groupId.split(',').map(id => id.trim())
-        : [];
+    if (Ids !== null && numbers === null) {
+      for (const id of Ids) {
+        const user = await CLIENT_COLLECTION.findOne({ _id: id, isDeleted: false });
+        if (!user) continue;
+        const existingGroupIds = user.groupId && user.groupId !== CONSTANT.NULL_STRING
+          ? user.groupId.split(',').map(id => id.trim())
+          : [];
 
-      const mergedGroupIds = Array.from(new Set([...existingGroupIds, newGroupId])).join(', ');
+        const mergedGroupIds = Array.from(new Set([...existingGroupIds, newGroupId])).join(', ');
 
-      const existingGroupNames = user.groupName && user.groupName !== CONSTANT.NULL_STRING
-        ? user.groupName.split(',').map(name => name.trim())
-        : [];
+        const existingGroupNames = user.groupName && user.groupName !== CONSTANT.NULL_STRING
+          ? user.groupName.split(',').map(name => name.trim())
+          : [];
 
-      const mergedGroupNames = Array.from(new Set([...existingGroupNames, name.name])).join(', ');
+        const mergedGroupNames = Array.from(new Set([...existingGroupNames, name.name])).join(', ');
 
-      const updatedUser = await CLIENT_COLLECTION.findOneAndUpdate(
-        { _id: id, isDeleted: false },
-        {
-          $set: {
-            groupId: mergedGroupIds,
-            groupName: mergedGroupNames,
+        const updatedUser = await CLIENT_COLLECTION.findOneAndUpdate(
+          { _id: id, isDeleted: false },
+          {
+            $set: {
+              groupId: mergedGroupIds,
+              groupName: mergedGroupNames,
+            },
           },
-        },
-        { new: true }
-      );
+          { new: true }
+        );
+        if (updatedUser) results.push(updatedUser);
+      }
+    } else {
+      for (const number of numbers) {
+        const user = await CLIENT_COLLECTION.findOne({ whatsapp_number: number, isDeleted: false });
+        if (!user) continue;
+        const existingGroupIds = user.groupId && user.groupId !== CONSTANT.NULL_STRING
+          ? user.groupId.split(',').map(id => id.trim())
+          : [];
 
-      if (updatedUser) results.push(updatedUser);
+        const mergedGroupIds = Array.from(new Set([...existingGroupIds, newGroupId])).join(', ');
+
+        const existingGroupNames = user.groupName && user.groupName !== CONSTANT.NULL_STRING
+          ? user.groupName.split(',').map(name => name.trim())
+          : [];
+
+        const mergedGroupNames = Array.from(new Set([...existingGroupNames, name.name])).join(', ');
+
+        const updatedUser = await CLIENT_COLLECTION.findOneAndUpdate(
+          { whatsapp_number: number, isDeleted: false },
+          {
+            $set: {
+              groupId: mergedGroupIds,
+              groupName: mergedGroupNames,
+              isNumberOnWhatsapp:"no"
+            },
+          },
+          { new: true }
+        );
+        if (updatedUser) results.push(updatedUser);
+      }
     }
 
     res.status(200).json({
