@@ -143,12 +143,18 @@ async function updateWhatsappStatuses(data) {
                                 continue;
                             }
 
-                            if (["read", "accepted", "sent"].includes(status.status)) {
-                                const campaign = await CAMPAIGN_MODULE.findOne({ _id: updatedData.camId });
+                            if (["sent"].includes(status.status)) {
+                                try {
+                                    if (!updatedData.camId) {
+                                        console.error("Invalid camId:", updatedData.camId);
+                                        return;
+                                    }
+                                    const campaign = await CAMPAIGN_MODULE.findOne({ _id: updatedData.camId });
+                                    if (!campaign) {
+                                        console.warn(`Campaign not found for camId: ${updatedData.camId}`);
+                                        return;
+                                    }
 
-                                if (!campaign) {
-                                    console.log(`Campaign not found for camId: ${updatedData.camId}`);
-                                } else {
                                     const currentReceiver = parseInt(campaign.receiver, 10) || 0;
                                     const updatedReceiver = (currentReceiver + 1).toString();
                                     const campaignUpdate = await CAMPAIGN_MODULE.findOneAndUpdate(
@@ -156,17 +162,18 @@ async function updateWhatsappStatuses(data) {
                                         { receiver: updatedReceiver },
                                         { new: true }
                                     );
-
                                     if (!campaignUpdate) {
-                                        console.log(`Failed to update CAMPAIGN_MODULE for camId: ${updatedData.camId}`);
+                                        console.error(`Failed to update CAMPAIGN_MODULE for camId: ${updatedData.camId}`);
                                     } else {
-                                        console.log(`Updated CAMPAIGN_MODULE receiver:`, campaignUpdate.receiver);
+                                        console.log(`Successfully updated CAMPAIGN_MODULE receiver to ${campaignUpdate.receiver} for camId: ${updatedData.camId}`);
                                     }
+                                } catch (error) {
+                                    console.error(`Error updating CAMPAIGN_MODULE for camId: ${updatedData.camId}`, error);
                                 }
                             }
 
                             if (updatedData?.msgType === "utility") {
-                                if (["read", "failed", "accepted"].includes(status.status)) {
+                                if (["read", "failed"].includes(status.status)) {
                                     const { camId, mobileNumber } = updatedData;
                                     if (!mobileNumber) {
                                         console.error(`mobileNumber is missing in MESSAGE_LOG entry for camId: ${camId}`);
