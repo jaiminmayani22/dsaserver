@@ -1500,25 +1500,14 @@ exports.addContactsToGroup = async (req, res) => {
       for (const number of numbers) {
         const user = await CLIENT_COLLECTION.findOne({ whatsapp_number: number, isDeleted: false });
         if (!user) continue;
-        const existingGroupIds = user.groupId && user.groupId !== CONSTANT.NULL_STRING
-          ? user.groupId.split(',').map(id => id.trim())
-          : [];
-
-        const mergedGroupIds = Array.from(new Set([...existingGroupIds, newGroupId])).join(', ');
-
-        const existingGroupNames = user.groupName && user.groupName !== CONSTANT.NULL_STRING
-          ? user.groupName.split(',').map(name => name.trim())
-          : [];
-
-        const mergedGroupNames = Array.from(new Set([...existingGroupNames, name.name])).join(', ');
 
         const updatedUser = await CLIENT_COLLECTION.findOneAndUpdate(
           { whatsapp_number: number, isDeleted: false },
           {
             $set: {
-              groupId: mergedGroupIds,
-              groupName: mergedGroupNames,
-              isNumberOnWhatsapp:"no"
+              groupId: name.groupId,
+              groupName: name.name,
+              isNumberOnWhatsapp: "no"
             },
           },
           { new: true }
