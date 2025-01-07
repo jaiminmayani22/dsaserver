@@ -647,108 +647,114 @@ exports.getMessageLog = async (req, res) => {
 
 // FUNCTIONS FOR WHATSAPP MESSAGE
 const sendInstantMessage = async (req, res) => {
-  const { _id, caption, messageType, document, audienceIds, documentType, freezedAudienceIds, freezedSend } = req.body;
+  try {
+    const { _id, caption, messageType, document, audienceIds, documentType, freezedAudienceIds, freezedSend } = req.body;
+    if (!_id || !messageType) {
+      return res.status(400).json({ message: "Campaign ID and message type are required." });
+    }
 
-  const mobileNumbers = [];
-  const freezedAudience = [];
-  const oneHourAgo = Date.now() - 3600000;
-  let clients;
+    const mobileNumbers = [];
+    const freezedAudience = [];
+    const oneHourAgo = Date.now() - 3600000;
+    let clients;
 
-  if (freezedSend && freezedSend === 'yes') {
-    clients = await CLIENT_MODULE.find({ _id: { $in: freezedAudienceIds }, isDeleted: false });
-  } else {
-    clients = await CLIENT_MODULE.find({ _id: { $in: audienceIds }, isDeleted: false });
-  }
+    try {
+      clients = await CLIENT_MODULE.find({
+        _id: { $in: freezedSend === 'yes' ? freezedAudienceIds : audienceIds },
+        isDeleted: false,
+      });
 
-  for (const client of clients) {
-    if (client.whatsapp_number) {
-      const latestLog = await MESSAGE_LOG.findOne({ mobileNumber: client.whatsapp_number, isDeleted: false })
-        .sort({ updatedAt: -1 });
+      if (!clients.length) {
+        return res.status(404).json({ message: "No valid clients found for the given audience IDs." });
+      }
+    } catch (dbError) {
+      console.error("Error fetching clients:", dbError);
+      return res.status(500).json({ message: "Database error while retrieving clients.", error: dbError.message });
+    }
 
-      if (latestLog) {
-        const isStatusInvalid = !['read', 'sent', 'delivered'].includes(latestLog.status);
-        const isWithinLastHour =
-          latestLog.updatedAt instanceof Date &&
-          latestLog.updatedAt.getTime() > oneHourAgo &&
-          latestLog.updatedAt.getTime() <= Date.now();
+    try {
+      for (const client of clients) {
+        if (client.whatsapp_number) {
+          const latestLog = await MESSAGE_LOG.findOne({ mobileNumber: client.whatsapp_number, isDeleted: false }).sort({ updatedAt: -1 });
 
-        if (isStatusInvalid && isWithinLastHour) {
-          freezedAudience.push(client._id);
-          continue;
+          if (latestLog) {
+            const isStatusInvalid = !['read', 'sent', 'delivered'].includes(latestLog.status);
+            const isWithinLastHour =
+              latestLog.updatedAt instanceof Date &&
+              latestLog.updatedAt.getTime() > oneHourAgo &&
+              latestLog.updatedAt.getTime() <= Date.now();
+
+            if (isStatusInvalid && isWithinLastHour) {
+              freezedAudience.push(client._id);
+              continue;
+            }
+          }
+          mobileNumbers.push(client.whatsapp_number);
         }
       }
-      mobileNumbers.push(client.whatsapp_number);
+    } catch (logError) {
+      console.error("Error processing message logs:", logError);
+      return res.status(500).json({ message: "Error while processing message logs.", error: logError.message });
     }
-  }
 
-  if (freezedAudience.length > 0) {
-    await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { freezedAudienceIds: freezedAudience });
-  } else {
-    await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { freezedAudienceIds: [] });
-  }
-
-  const imageUrl = document.url;
-  await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { status: "processing" }, { new: true });
-
-  if (messageType === 'marketing' && imageUrl) {
     try {
-      await sendMarketingWhatsAppMessages(mobileNumbers, imageUrl, _id, caption, messageType, documentType);
-      return res.status(200).json({
-        message: CONSTANT.COLLECTION.CAMPAIGN + CONSTANT.MESSAGE.CREATE_SENT_SUCCESSFULLY,
-      });
-    } catch (error) {
-      console.error("Error sending WhatsApp messages:", error);
-      await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { status: "" }, { new: true });
-      return res.status(500).json({
-        message: CONSTANT.COLLECTION.CAMPAIGN + CONSTANT.MESSAGE.SENT_FAILED,
-        error: error.message,
-      });
+      await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { freezedAudienceIds: freezedAudience.length ? freezedAudience : [] });
+    } catch (updateError) {
+      console.error("Error updating campaign:", updateError);
+      return res.status(500).json({ message: "Failed to update campaign data.", error: updateError.message });
     }
-  } else if (messageType === 'utility' && imageUrl) {
-    const selectedRefTemplate = req.body.selectedRefTemplate;
-    try {
-      const sendSuccess = await sendUtilityWhatsAppMessages(
-        mobileNumbers,
-        imageUrl,
-        _id,
-        caption,
-        selectedRefTemplate,
-        messageType
-      );
 
-      if (sendSuccess) {
-        return res.status(200).json({
-          message: CONSTANT.COLLECTION.CAMPAIGN + CONSTANT.MESSAGE.CREATE_SENT_SUCCESSFULLY,
-        });
-      } else {
-        console.log("Message sent successfully for campaign:", req.body.name);
+    const imageUrl = document?.url || null;
+    try {
+      await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { status: "processing" }, { new: true });
+    } catch (statusUpdateError) {
+      console.error("Error updating campaign status:", statusUpdateError);
+      return res.status(500).json({ message: "Failed to update campaign status.", error: statusUpdateError.message });
+    }
+
+    if (messageType === 'marketing' && imageUrl) {
+      try {
+        await sendMarketingWhatsAppMessages(mobileNumbers, imageUrl, _id, caption, messageType, documentType);
+        return res.status(200).json({ message: `${CONSTANT.COLLECTION.CAMPAIGN} ${CONSTANT.MESSAGE.CREATE_SENT_SUCCESSFULLY}` });
+      } catch (error) {
+        console.error("Error sending marketing messages:", error);
+        await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { status: "" }, { new: true });
+        return res.status(500).json({ message: `${CONSTANT.COLLECTION.CAMPAIGN} ${CONSTANT.MESSAGE.SENT_FAILED}`, error: error.message });
       }
-    } catch (error) {
-      await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { status: "" }, { new: true });
-      console.error("Error occurred while sending messages:", error);
-      return res.status(500).json({
-        message: CONSTANT.COLLECTION.CAMPAIGN + CONSTANT.MESSAGE.SENT_FAILED,
-        error: error.message,
-      });
     }
-  } else if (!imageUrl && caption) {
-    try {
-      await sendTextWhatsAppMessages(mobileNumbers, _id, caption, messageType);
-      if (res) {
-        return res.status(200).json({
-          message: CONSTANT.COLLECTION.CAMPAIGN + CONSTANT.MESSAGE.CREATE_SENT_SUCCESSFULLY,
-        });
-      } else {
-        console.log("Message sent successfully for campaign : ", req.body.name);
+
+    if (messageType === 'utility' && imageUrl) {
+      try {
+        const sendSuccess = await sendUtilityWhatsAppMessages(mobileNumbers, imageUrl, _id, caption, selectedRefTemplate, messageType);
+
+        if (sendSuccess) {
+          return res.status(200).json({ message: `${CONSTANT.COLLECTION.CAMPAIGN} ${CONSTANT.MESSAGE.CREATE_SENT_SUCCESSFULLY}` });
+        } else {
+          console.warn("Message sent but not confirmed for campaign:", req.body.name);
+        }
+      } catch (error) {
+        console.error("Error sending utility messages:", error);
+        await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { status: "" }, { new: true });
+        return res.status(500).json({ message: `${CONSTANT.COLLECTION.CAMPAIGN} ${CONSTANT.MESSAGE.SENT_FAILED}`, error: error.message });
       }
-    } catch (error) {
-      await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { status: "" }, { new: true });
-      return res.status(500).json({
-        message: CONSTANT.COLLECTION.CAMPAIGN + CONSTANT.MESSAGE.SENT_FAILED,
-        error: error.message,
-      });
     }
-  };
+
+    if (!imageUrl && caption) {
+      try {
+        await sendTextWhatsAppMessages(mobileNumbers, _id, caption, messageType);
+        return res.status(200).json({ message: `${CONSTANT.COLLECTION.CAMPAIGN} ${CONSTANT.MESSAGE.CREATE_SENT_SUCCESSFULLY}` });
+      } catch (error) {
+        console.error("Error sending text messages:", error);
+        await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { status: "" }, { new: true });
+        return res.status(500).json({ message: `${CONSTANT.COLLECTION.CAMPAIGN} ${CONSTANT.MESSAGE.SENT_FAILED}`, error: error.message });
+      }
+    }
+
+    return res.status(400).json({ message: "Invalid messageType or missing required parameters." });
+  } catch (error) {
+    console.error("Unexpected error:", error);
+    return res.status(500).json({ message: "An unexpected error occurred.", error: error.message });
+  }
 };
 exports.sendMessage = sendInstantMessage;
 
@@ -1094,6 +1100,8 @@ const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, 
 
 const whatsappAPISend = async (messageData, _id, messageType, caption) => {
   try {
+    await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { $inc: { process: 1 } }, { new: true });
+
     const response = await fetch(process.env.WHATSAPP_API_URL, {
       method: 'POST',
       headers: {
@@ -1142,7 +1150,6 @@ const whatsappAPISend = async (messageData, _id, messageType, caption) => {
           ...obj
         });
       }
-      await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { $inc: { process: 1 } }, { new: true });
       return true;
     } catch (error) {
       console.log("Error updating or creating message log : ", error.message);
