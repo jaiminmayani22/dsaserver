@@ -776,6 +776,7 @@ const sendMarketingWhatsAppMessages = async (mobileNumbers, images, _id, caption
       try {
         const messageData = prepareMessageData(mobileNumber, images, caption, documentType);
         await whatsappAPISend(messageData, _id, messageType, caption);
+        continue;
       } catch (error) {
         console.log(`Failed to send message to ${mobileNumber} : `, error);
       }
@@ -851,6 +852,7 @@ const sendTextWhatsAppMessages = async (mobileNumbers, _id, caption, messageType
         };
 
         await whatsappAPISend(messageData, _id, messageType, caption);
+        continue;
       } catch (error) {
         console.log(`Failed to send message to ${mobileNumber}:`, error);
       }
@@ -1087,6 +1089,7 @@ const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, 
         };
 
         await whatsappAPISend(messageData, _id, messageType, caption);
+        continue;
       } catch (error) {
         console.log(`Failed to process mobile number ${mobileNumber}:`, error);
       }
