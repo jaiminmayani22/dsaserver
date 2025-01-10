@@ -1199,6 +1199,18 @@ exports.getMessagesForCampaign = async (req, res) => {
         },
       },
       {
+        $sort: { updatedAt: -1 },
+      },
+      {
+        $group: {
+          _id: { camId: "$camId", mobileNumber: "$mobileNumber" },
+          latestLog: { $first: "$$ROOT" },
+        },
+      },
+      {
+        $replaceRoot: { newRoot: "$latestLog" },
+      },
+      {
         $project: {
           _id: 1,
           camId: 1,
