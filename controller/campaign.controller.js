@@ -650,7 +650,9 @@ const sendInstantMessage = async (req, res) => {
   try {
     const { _id, caption, messageType, document, audienceIds, documentType, freezedAudienceIds, freezedSend } = req.body;
     if (!_id || !messageType) {
-      return res.status(400).json({ message: "Campaign ID and message type are required." });
+      if (res) {
+        return res.status(400).json({ message: "Campaign ID and message type are required." });
+      }
     }
 
     const mobileNumbers = [];
@@ -665,11 +667,15 @@ const sendInstantMessage = async (req, res) => {
       });
 
       if (!clients.length) {
-        return res.status(404).json({ message: "No valid clients found for the given audience IDs." });
+        if (res) {
+          return res.status(404).json({ message: "No valid clients found for the given audience IDs." });
+        }
       }
     } catch (dbError) {
       console.error("Error fetching clients:", dbError);
-      return res.status(500).json({ message: "Database error while retrieving clients.", error: dbError.message });
+      if (res) {
+        return res.status(500).json({ message: "Database error while retrieving clients.", error: dbError.message });
+      }
     }
 
     try {
@@ -694,14 +700,18 @@ const sendInstantMessage = async (req, res) => {
       }
     } catch (logError) {
       console.error("Error processing message logs:", logError);
-      return res.status(500).json({ message: "Error while processing message logs.", error: logError.message });
+      if (res) {
+        return res.status(500).json({ message: "Error while processing message logs.", error: logError.message });
+      }
     }
 
     try {
       await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { freezedAudienceIds: freezedAudience.length ? freezedAudience : [] });
     } catch (updateError) {
       console.error("Error updating campaign:", updateError);
-      return res.status(500).json({ message: "Failed to update campaign data.", error: updateError.message });
+      if (res) {
+        return res.status(500).json({ message: "Failed to update campaign data.", error: updateError.message });
+      }
     }
 
     const imageUrl = document?.url || null;
@@ -709,17 +719,24 @@ const sendInstantMessage = async (req, res) => {
       await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { status: "processing" }, { new: true });
     } catch (statusUpdateError) {
       console.error("Error updating campaign status:", statusUpdateError);
-      return res.status(500).json({ message: "Failed to update campaign status.", error: statusUpdateError.message });
+      if (res) {
+        return res.status(500).json({ message: "Failed to update campaign status.", error: statusUpdateError.message });
+      }
     }
 
     if (messageType === 'marketing' && imageUrl) {
       try {
         await sendMarketingWhatsAppMessages(mobileNumbers, imageUrl, _id, caption, messageType, documentType);
-        return res.status(200).json({ message: `${CONSTANT.COLLECTION.CAMPAIGN} ${CONSTANT.MESSAGE.CREATE_SENT_SUCCESSFULLY}` });
+        console.log("Campaign sent succesfully : ", _id, caption);
+        if (res) {
+          return res.status(200).json({ message: `${CONSTANT.COLLECTION.CAMPAIGN} ${CONSTANT.MESSAGE.CREATE_SENT_SUCCESSFULLY}` });
+        }
       } catch (error) {
         console.error("Error sending marketing messages:", error);
         await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { status: "" }, { new: true });
-        return res.status(500).json({ message: `${CONSTANT.COLLECTION.CAMPAIGN} ${CONSTANT.MESSAGE.SENT_FAILED}`, error: error.message });
+        if (res) {
+          return res.status(500).json({ message: `${CONSTANT.COLLECTION.CAMPAIGN} ${CONSTANT.MESSAGE.SENT_FAILED}`, error: error.message });
+        }
       }
     }
 
@@ -728,41 +745,63 @@ const sendInstantMessage = async (req, res) => {
         const sendSuccess = await sendUtilityWhatsAppMessages(mobileNumbers, imageUrl, _id, caption, selectedRefTemplate, messageType);
 
         if (sendSuccess) {
-          return res.status(200).json({ message: `${CONSTANT.COLLECTION.CAMPAIGN} ${CONSTANT.MESSAGE.CREATE_SENT_SUCCESSFULLY}` });
+          if (res) {
+            return res.status(200).json({ message: `${CONSTANT.COLLECTION.CAMPAIGN} ${CONSTANT.MESSAGE.CREATE_SENT_SUCCESSFULLY}` });
+          }
+          console.log("Campaign sent succesfully : ", _id, caption);
         } else {
           console.warn("Message sent but not confirmed for campaign:", req.body.name);
         }
       } catch (error) {
         console.error("Error sending utility messages:", error);
         await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { status: "" }, { new: true });
-        return res.status(500).json({ message: `${CONSTANT.COLLECTION.CAMPAIGN} ${CONSTANT.MESSAGE.SENT_FAILED}`, error: error.message });
+        if (res) {
+          return res.status(500).json({ message: `${CONSTANT.COLLECTION.CAMPAIGN} ${CONSTANT.MESSAGE.SENT_FAILED}`, error: error.message });
+        }
       }
     }
 
     if (!imageUrl && caption) {
       try {
         await sendTextWhatsAppMessages(mobileNumbers, _id, caption, messageType);
-        return res.status(200).json({ message: `${CONSTANT.COLLECTION.CAMPAIGN} ${CONSTANT.MESSAGE.CREATE_SENT_SUCCESSFULLY}` });
+        if (res) {
+          return res.status(200).json({ message: `${CONSTANT.COLLECTION.CAMPAIGN} ${CONSTANT.MESSAGE.CREATE_SENT_SUCCESSFULLY}` });
+        }
+        console.log("Campaign sent successfully : ", _id, caption);
       } catch (error) {
         console.error("Error sending text messages:", error);
         await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { status: "" }, { new: true });
-        return res.status(500).json({ message: `${CONSTANT.COLLECTION.CAMPAIGN} ${CONSTANT.MESSAGE.SENT_FAILED}`, error: error.message });
+        if (res) {
+          return res.status(500).json({ message: `${CONSTANT.COLLECTION.CAMPAIGN} ${CONSTANT.MESSAGE.SENT_FAILED}`, error: error.message });
+        }
       }
     }
 
-    return res.status(400).json({ message: "Invalid messageType or missing required parameters." });
+    if (res) {
+      return res.status(400).json({ message: "Invalid messageType or missing required parameters." });
+    }
   } catch (error) {
     console.error("Unexpected error:", error);
-    return res.status(500).json({ message: "An unexpected error occurred.", error: error.message });
+    if (res) {
+      return res.status(500).json({ message: "An unexpected error occurred.", error: error.message });
+    }
   }
 };
 exports.sendMessage = sendInstantMessage;
 
 const updateCampaignStatus = async (_id, status) => {
+  if (!_id) {
+    console.log("Error: Cannot update status because campaign _id is missing.");
+    return;
+  }
+
   try {
-    await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { status: status }, { new: true });
+    const updatedCampaign = await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { status: status }, { new: true });
+    if (!updatedCampaign) {
+      console.log(`Warning: No campaign found with ID ${_id}, status update skipped.`);
+    }
   } catch (updateError) {
-    console.log(`Failed to update status for campaign ${_id} : `, updateError);
+    console.log(`Failed to update status for campaign ${_id}:`, updateError);
   }
 };
 
@@ -784,10 +823,14 @@ const sendMarketingWhatsAppMessages = async (mobileNumbers, images, _id, caption
   } catch (error) {
     console.log(`Error in sending WhatsApp messages for campaign ${_id} : `, error);
   } finally {
-    try {
-      await updateCampaignStatus(_id, "completed");
-    } catch (updateError) {
-      console.log(`Failed to update campaign status for campaign ${_id} : `, updateError);
+    if (_id) {
+      try {
+        await updateCampaignStatus(_id, "completed");
+      } catch (updateError) {
+        console.log(`Failed to update campaign status for campaign ${_id}:`, updateError);
+      }
+    } else {
+      console.log("Warning: Cannot update campaign status because _id is undefined.");
     }
   }
 };
@@ -860,10 +903,14 @@ const sendTextWhatsAppMessages = async (mobileNumbers, _id, caption, messageType
   } catch (error) {
     console.log(`Error in sending WhatsApp messages for campaign ${_id}:`, error);
   } finally {
-    try {
-      await updateCampaignStatus(_id, "completed");
-    } catch (updateError) {
-      console.log(`Failed to update campaign status for campaign ${_id}:`, updateError);
+    if (_id) {
+      try {
+        await updateCampaignStatus(_id, "completed");
+      } catch (updateError) {
+        console.log(`Failed to update campaign status for campaign ${_id}:`, updateError);
+      }
+    } else {
+      console.log("Warning: Cannot update campaign status because _id is undefined.");
     }
   }
 };
@@ -1094,7 +1141,15 @@ const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, 
         console.log(`Failed to process mobile number ${mobileNumber}:`, error);
       }
     }
-    await updateCampaignStatus(_id, "completed");
+    if (_id) {
+      try {
+        await updateCampaignStatus(_id, "completed");
+      } catch (updateError) {
+        console.log(`Failed to update campaign status for campaign ${_id}:`, updateError);
+      }
+    } else {
+      console.log("Warning: Cannot update campaign status because _id is undefined.");
+    }
     return true;
   } catch (error) {
     console.log(`Failed to send WhatsApp messages for campaign ${_id}:`, error);
