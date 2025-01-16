@@ -656,8 +656,11 @@ const sendInstantMessage = async (req, res, cron) => {
   try {
     const { _id, caption, messageType, document, audienceIds, documentType, freezedAudienceIds, freezedSend } = req.body;
     if (!_id || !messageType) {
-      if (cron === null) {
+      if (cron !== true && res) {
         return res.status(400).json({ message: "Campaign ID and message type are required." });
+      } else {
+        console.error("Campaign ID and message type are required.");
+        return;
       }
     }
 
@@ -673,14 +676,19 @@ const sendInstantMessage = async (req, res, cron) => {
       });
 
       if (!clients.length) {
-        if (cron === null) {
+        if (cron !== true && res) {
           return res.status(404).json({ message: "No valid clients found for the given audience IDs." });
+        } else {
+          console.error("No valid clients found for the given audience IDs.");
+          return;
         }
       }
     } catch (dbError) {
-      console.error("Error fetching clients:", dbError);
-      if (cron === null) {
+      if (cron !== true && res) {
         return res.status(500).json({ message: "Database error while retrieving clients.", error: dbError.message });
+      } else {
+        console.error("Error fetching clients:", dbError);
+        return;
       }
     }
 
@@ -705,18 +713,22 @@ const sendInstantMessage = async (req, res, cron) => {
         }
       }
     } catch (logError) {
-      console.error("Error processing message logs:", logError);
-      if (cron === null) {
+      if (cron !== true && res) {
         return res.status(500).json({ message: "Error while processing message logs.", error: logError.message });
+      } else {
+        console.error("Error processing message logs:", logError);
+        return;
       }
     }
 
     try {
       await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { freezedAudienceIds: freezedAudience.length ? freezedAudience : [] });
     } catch (updateError) {
-      console.error("Error updating campaign:", updateError);
-      if (cron === null) {
+      if (cron !== true && res) {
         return res.status(500).json({ message: "Failed to update campaign data.", error: updateError.message });
+      } else {
+        console.error("Error updating campaign:", updateError);
+        return;
       }
     }
 
@@ -724,24 +736,30 @@ const sendInstantMessage = async (req, res, cron) => {
     try {
       await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { status: "processing" }, { new: true });
     } catch (statusUpdateError) {
-      console.error("Error updating campaign status:", statusUpdateError);
-      if (cron === null) {
+      if (cron !== true && res) {
         return res.status(500).json({ message: "Failed to update campaign status.", error: statusUpdateError.message });
+      } else {
+        console.error("Failed to update campaign status:", statusUpdateError);
+        return;
       }
     }
 
     if (messageType === 'marketing' && imageUrl) {
       try {
         await sendMarketingWhatsAppMessages(mobileNumbers, imageUrl, _id, caption, messageType, documentType);
-        console.log("Campaign sent succesfully : ", _id, caption);
-        if (cron === null) {
+        if (cron !== true && res) {
           return res.status(200).json({ message: `${CONSTANT.COLLECTION.CAMPAIGN} ${CONSTANT.MESSAGE.CREATE_SENT_SUCCESSFULLY}` });
+        } else {
+          console.log("Campaign sent succesfully : ", _id, caption);
+          return;
         }
       } catch (error) {
-        console.error("Error sending marketing messages:", error);
         await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { status: "" }, { new: true });
-        if (cron === null) {
+        if (cron !== true && res) {
           return res.status(500).json({ message: `${CONSTANT.COLLECTION.CAMPAIGN} ${CONSTANT.MESSAGE.SENT_FAILED}`, error: error.message });
+        } else {
+          console.error("Error sending marketing messages:", error);
+          return;
         }
       }
     }
@@ -751,18 +769,23 @@ const sendInstantMessage = async (req, res, cron) => {
         const sendSuccess = await sendUtilityWhatsAppMessages(mobileNumbers, imageUrl, _id, caption, selectedRefTemplate, messageType);
 
         if (sendSuccess) {
-          if (cron === null) {
+          if (cron !== true && res) {
             return res.status(200).json({ message: `${CONSTANT.COLLECTION.CAMPAIGN} ${CONSTANT.MESSAGE.CREATE_SENT_SUCCESSFULLY}` });
+          } else {
+            console.log("Campaign sent succesfully : ", _id, caption);
+            return;
           }
-          console.log("Campaign sent succesfully : ", _id, caption);
         } else {
           console.warn("Message sent but not confirmed for campaign:", req.body.name);
+          return;
         }
       } catch (error) {
-        console.error("Error sending utility messages:", error);
         await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { status: "" }, { new: true });
-        if (cron === null) {
+        if (cron !== true && res) {
           return res.status(500).json({ message: `${CONSTANT.COLLECTION.CAMPAIGN} ${CONSTANT.MESSAGE.SENT_FAILED}`, error: error.message });
+        } else {
+          console.error("Error sending utility messages:", error);
+          return;
         }
       }
     }
@@ -770,26 +793,35 @@ const sendInstantMessage = async (req, res, cron) => {
     if (!imageUrl && caption) {
       try {
         await sendTextWhatsAppMessages(mobileNumbers, _id, caption, messageType);
-        if (cron === null) {
+        if (cron !== true && res) {
           return res.status(200).json({ message: `${CONSTANT.COLLECTION.CAMPAIGN} ${CONSTANT.MESSAGE.CREATE_SENT_SUCCESSFULLY}` });
+        } else {
+          console.log("Campaign sent successfully : ", _id, caption);
+          return;
         }
-        console.log("Campaign sent successfully : ", _id, caption);
       } catch (error) {
-        console.error("Error sending text messages:", error);
         await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { status: "" }, { new: true });
-        if (cron === null) {
+        if (cron !== true && res) {
           return res.status(500).json({ message: `${CONSTANT.COLLECTION.CAMPAIGN} ${CONSTANT.MESSAGE.SENT_FAILED}`, error: error.message });
+        } else {
+          console.error("Error sending text messages:", error);
+          return;
         }
       }
     }
 
-    if (cron === null) {
+    if (cron !== true && res) {
       return res.status(400).json({ message: "Invalid messageType or missing required parameters." });
+    } else {
+      console.error("Invalid message type or missing required parameters.");
+      return;
     }
   } catch (error) {
-    console.error("Unexpected error:", error);
-    if (cron === null) {
+    if (cron !== true && res) {
       return res.status(500).json({ message: "An unexpected error occurred.", error: error.message });
+    } else {
+      console.error("An unexpected error occurred:", error);
+      return;
     }
   }
 };
