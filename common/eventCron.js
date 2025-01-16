@@ -25,7 +25,7 @@ class eventCron {
             };
             await CAMPAIGN_COLLECTION.findByIdAndUpdate(campaign._id, { passedCron: true }, { new: true });
             console.log("Schedule campaign triggered : ", campaign.name);
-            await CAMP_CTRL.sendMessage(mockReq, null);
+            await CAMP_CTRL.sendMessage(mockReq, null, true);
           }
         }
       } catch (error) {
