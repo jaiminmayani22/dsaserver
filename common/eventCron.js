@@ -12,7 +12,8 @@ class eventCron {
           isDeleted: false,
           type: "schedule",
           process: 0,
-          status: ""
+          status: "",
+          passedCron: false
         });
 
         for (const campaign of campaigns) {
@@ -22,8 +23,9 @@ class eventCron {
             const mockReq = {
               body: campaign
             };
+            await CAMPAIGN_COLLECTION.findByIdAndUpdate(campaign._id, { passedCron: true }, { new: true });
             console.log("Schedule campaign triggered : ", campaign.name);
-            await CAMP_CTRL.sendMessage(mockReq);
+            await CAMP_CTRL.sendMessage(mockReq, null);
           }
         }
       } catch (error) {

@@ -413,8 +413,14 @@ exports.campaignAudienceCount = async (req, res) => {
 
       case "group":
         const groupArray = groups.split(',').map(groupId => groupId.trim());
-        const groupRegex = new RegExp(groupArray.map(groupId => `(^|,)${groupId}(,|$)`).join('|'));
-        const groupClients = await CLIENT_MODULE.find({ groupId: groupRegex, isDeleted: false }, { _id: 1 });
+        const groupRegex = new RegExp(`(^|,)(${groupArray.join('|')})(,|$)`);
+        const groupClients = await CLIENT_MODULE.find(
+          {
+            groupId: { $regex: groupRegex },
+            isDeleted: false
+          },
+          { _id: 1 }
+        );
         count = groupClients.length;
         break;
 
@@ -650,7 +656,7 @@ const sendInstantMessage = async (req, res) => {
   try {
     const { _id, caption, messageType, document, audienceIds, documentType, freezedAudienceIds, freezedSend } = req.body;
     if (!_id || !messageType) {
-      if (res) {
+      if (res !== null) {
         return res.status(400).json({ message: "Campaign ID and message type are required." });
       }
     }
@@ -667,13 +673,13 @@ const sendInstantMessage = async (req, res) => {
       });
 
       if (!clients.length) {
-        if (res) {
+        if (res !== null) {
           return res.status(404).json({ message: "No valid clients found for the given audience IDs." });
         }
       }
     } catch (dbError) {
       console.error("Error fetching clients:", dbError);
-      if (res) {
+      if (res !== null) {
         return res.status(500).json({ message: "Database error while retrieving clients.", error: dbError.message });
       }
     }
@@ -700,7 +706,7 @@ const sendInstantMessage = async (req, res) => {
       }
     } catch (logError) {
       console.error("Error processing message logs:", logError);
-      if (res) {
+      if (res !== null) {
         return res.status(500).json({ message: "Error while processing message logs.", error: logError.message });
       }
     }
@@ -709,7 +715,7 @@ const sendInstantMessage = async (req, res) => {
       await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { freezedAudienceIds: freezedAudience.length ? freezedAudience : [] });
     } catch (updateError) {
       console.error("Error updating campaign:", updateError);
-      if (res) {
+      if (res !== null) {
         return res.status(500).json({ message: "Failed to update campaign data.", error: updateError.message });
       }
     }
@@ -719,7 +725,7 @@ const sendInstantMessage = async (req, res) => {
       await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { status: "processing" }, { new: true });
     } catch (statusUpdateError) {
       console.error("Error updating campaign status:", statusUpdateError);
-      if (res) {
+      if (res !== null) {
         return res.status(500).json({ message: "Failed to update campaign status.", error: statusUpdateError.message });
       }
     }
@@ -728,13 +734,13 @@ const sendInstantMessage = async (req, res) => {
       try {
         await sendMarketingWhatsAppMessages(mobileNumbers, imageUrl, _id, caption, messageType, documentType);
         console.log("Campaign sent succesfully : ", _id, caption);
-        if (res) {
+        if (res !== null) {
           return res.status(200).json({ message: `${CONSTANT.COLLECTION.CAMPAIGN} ${CONSTANT.MESSAGE.CREATE_SENT_SUCCESSFULLY}` });
         }
       } catch (error) {
         console.error("Error sending marketing messages:", error);
         await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { status: "" }, { new: true });
-        if (res) {
+        if (res !== null) {
           return res.status(500).json({ message: `${CONSTANT.COLLECTION.CAMPAIGN} ${CONSTANT.MESSAGE.SENT_FAILED}`, error: error.message });
         }
       }
@@ -745,7 +751,7 @@ const sendInstantMessage = async (req, res) => {
         const sendSuccess = await sendUtilityWhatsAppMessages(mobileNumbers, imageUrl, _id, caption, selectedRefTemplate, messageType);
 
         if (sendSuccess) {
-          if (res) {
+          if (res !== null) {
             return res.status(200).json({ message: `${CONSTANT.COLLECTION.CAMPAIGN} ${CONSTANT.MESSAGE.CREATE_SENT_SUCCESSFULLY}` });
           }
           console.log("Campaign sent succesfully : ", _id, caption);
@@ -755,7 +761,7 @@ const sendInstantMessage = async (req, res) => {
       } catch (error) {
         console.error("Error sending utility messages:", error);
         await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { status: "" }, { new: true });
-        if (res) {
+        if (res !== null) {
           return res.status(500).json({ message: `${CONSTANT.COLLECTION.CAMPAIGN} ${CONSTANT.MESSAGE.SENT_FAILED}`, error: error.message });
         }
       }
@@ -764,25 +770,25 @@ const sendInstantMessage = async (req, res) => {
     if (!imageUrl && caption) {
       try {
         await sendTextWhatsAppMessages(mobileNumbers, _id, caption, messageType);
-        if (res) {
+        if (res !== null) {
           return res.status(200).json({ message: `${CONSTANT.COLLECTION.CAMPAIGN} ${CONSTANT.MESSAGE.CREATE_SENT_SUCCESSFULLY}` });
         }
         console.log("Campaign sent successfully : ", _id, caption);
       } catch (error) {
         console.error("Error sending text messages:", error);
         await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { status: "" }, { new: true });
-        if (res) {
+        if (res !== null) {
           return res.status(500).json({ message: `${CONSTANT.COLLECTION.CAMPAIGN} ${CONSTANT.MESSAGE.SENT_FAILED}`, error: error.message });
         }
       }
     }
 
-    if (res) {
+    if (res !== null) {
       return res.status(400).json({ message: "Invalid messageType or missing required parameters." });
     }
   } catch (error) {
     console.error("Unexpected error:", error);
-    if (res) {
+    if (res !== null) {
       return res.status(500).json({ message: "An unexpected error occurred.", error: error.message });
     }
   }
