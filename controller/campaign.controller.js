@@ -654,7 +654,7 @@ exports.getMessageLog = async (req, res) => {
 // FUNCTIONS FOR WHATSAPP MESSAGE
 const sendInstantMessage = async (req, res, cron) => {
   try {
-    const { _id, caption, messageType, document, audienceIds, documentType, freezedAudienceIds, freezedSend } = req.body;
+    const { _id, caption, messageType, document, audienceIds, documentType, freezedAudienceIds, freezedSend, selectedRefTemplate } = req.body;
     if (!_id || !messageType) {
       if (cron !== true && res) {
         return res.status(400).json({ message: "Campaign ID and message type are required." });
@@ -664,8 +664,8 @@ const sendInstantMessage = async (req, res, cron) => {
       }
     }
 
-    const mobileNumbers = [];
-    const freezedAudience = [];
+    let mobileNumbers = [];
+    let freezedAudience = [];
     const oneHourAgo = Date.now() - 3600000;
     let clients;
 
@@ -743,6 +743,7 @@ const sendInstantMessage = async (req, res, cron) => {
         return;
       }
     }
+    mobileNumbers = [...new Set(mobileNumbers)];
 
     if (messageType === 'marketing' && imageUrl) {
       try {
@@ -851,7 +852,7 @@ const sendMarketingWhatsAppMessages = async (mobileNumbers, images, _id, caption
   try {
     for (const mobileNumber of mobileNumbers) {
       try {
-        const messageData = prepareMessageData(mobileNumber, images, caption, documentType);
+        const messageData = await prepareMessageData(mobileNumber, images, caption, documentType);
         await whatsappAPISend(messageData, _id, messageType, caption);
         continue;
       } catch (error) {
@@ -989,16 +990,15 @@ const editUtilityImage = async ({
     const canvas = createCanvas(mainImage.width, mainImage.height);
     const ctx = canvas.getContext('2d');
     ctx.drawImage(mainImage, 0, 0, mainImage.width, mainImage.height);
-
     const layers = selectedRefTemplate.layers;
 
     for (const layer of layers) {
       const {
         type,
         content,
-        x,
-        y,
-        fontSize = '24px', // Default font size
+        calculatedx,
+        calculatedy,
+        size = '24', // Default font size
         fontWeight = 'normal', // Default font weight
         fontStyle = 'normal', // Default font style
         fontFamily = 'Times New Roman', // Default font family
@@ -1043,10 +1043,10 @@ const editUtilityImage = async ({
                   let logoWidth, logoHeight;
 
                   if (originalWidth > originalHeight) {
-                    logoWidth = parseFloat(fontSize);
+                    logoWidth = parseFloat(size);
                     logoHeight = (originalHeight / originalWidth) * logoWidth;
                   } else {
-                    logoHeight = parseFloat(fontSize);
+                    logoHeight = parseFloat(size);
                     logoWidth = (originalWidth / originalHeight) * logoHeight;
                   }
 
@@ -1055,23 +1055,26 @@ const editUtilityImage = async ({
                     logoWidth = (originalWidth / originalHeight) * logoHeight;
                   }
 
-                  const drawX = x - logoWidth / 2;
-                  const drawY = y - logoHeight / 2;
+                  const drawX = calculatedx - logoWidth / 2;
+                  const drawY = calculatedy - logoHeight / 2;
 
                   ctx.drawImage(logoImageLoaded, drawX, drawY, logoWidth, logoHeight);
 
                   updatedContent = updatedContent.replace(/logo/i, '');
                 }
+              } else {
+                console.error('Failed to fetch logo image:', logoResponse.statusText);
               }
             } catch (error) {
               console.error('Error loading logo image:', error);
             }
-          } else {
-            updatedContent = updatedContent.replace(/logo/i, '');
           }
+
+          updatedContent = updatedContent.replace(/logo/i, '');
         }
 
-        ctx.font = `${fontWeight} ${fontStyle} ${parseFloat(fontSize)}px ${fontFamily}`;
+
+        ctx.font = `${fontWeight} ${fontStyle} ${parseFloat(size)}px ${fontFamily}`;
         ctx.fillStyle = fillColor;
         ctx.textAlign = textAlign;
         ctx.textBaseline = textBaseline;
@@ -1079,17 +1082,17 @@ const editUtilityImage = async ({
         if (updatedContent) {
           if (textDecoration === 'underline') {
             const textWidth = ctx.measureText(stripHtmlTags(updatedContent)).width;
-            const lineHeight = parseFloat(fontSize);
-            ctx.fillText(stripHtmlTags(updatedContent), x, y);
+            const lineHeight = parseFloat(size);
+            ctx.fillText(stripHtmlTags(updatedContent), calculatedx, calculatedy);
 
             ctx.beginPath();
-            ctx.moveTo(x - textWidth / 2, y + lineHeight / 2);
-            ctx.lineTo(x + textWidth / 2, y + lineHeight / 2);
+            ctx.moveTo(calculatedx - textWidth / 2, calculatedy + lineHeight / 2);
+            ctx.lineTo(calculatedx + textWidth / 2, calculatedy + lineHeight / 2);
             ctx.strokeStyle = 'black';
             ctx.lineWidth = 1;
             ctx.stroke();
           } else {
-            ctx.fillText(stripHtmlTags(updatedContent), x, y);
+            ctx.fillText(stripHtmlTags(updatedContent), calculatedx, calculatedy);
           }
         }
       }
@@ -1210,6 +1213,14 @@ const whatsappAPISend = async (messageData, _id, messageType, caption) => {
     const data = await response.json();
     if (!response.ok) {
       console.log(`WhatsApp API Error : ${data.message || 'Unknown error'}`);
+      // return false;
+    }
+
+    if (!Array.isArray(data.contacts) || !Array.isArray(data.messages) || !data.contacts.length || !data.messages.length) {
+      console.error(`Invalid Whatsapp API response structure`,);
+      await CAMPAIGN_MODULE.findByIdAndUpdate(_id, {
+        $push: { unproceedNumbers: messageData.to }
+      }, { new: true });
       return false;
     }
 
@@ -1222,14 +1233,13 @@ const whatsappAPISend = async (messageData, _id, messageType, caption) => {
       messageTitle: caption,
     };
 
-    const existingLog = await MESSAGE_LOG.findOne({
-      camId: obj.camId,
-      mobileNumber: obj.mobileNumber,
-      waMessageId: obj.waMessageId,
-      msgType: obj.msgType,
-    });
-
     try {
+      const existingLog = await MESSAGE_LOG.findOne({
+        camId: obj.camId,
+        mobileNumber: obj.mobileNumber,
+        waMessageId: obj.waMessageId,
+        msgType: obj.msgType,
+      });
       if (existingLog) {
         await MESSAGE_LOG.updateOne(
           { _id: existingLog._id },
