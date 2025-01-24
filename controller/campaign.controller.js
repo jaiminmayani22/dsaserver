@@ -74,8 +74,9 @@ exports.createCampaignMarketing = async (req, res, folder) => {
 
           case "group":
             const groupArray = obj.groups.split(',').map(groupId => groupId.trim());
-            const groupRegex = new RegExp(groupArray.map(groupId => `(^|,)${groupId}(,|$)`).join('|'));
-
+            const groupRegex = new RegExp(
+              groupArray.map(groupId => `(^|,\\s*)${groupId}(,|\\s*|$)`).join('|')
+            );
             const groupClients = await CLIENT_MODULE.find({ groupId: groupRegex, isDeleted: false }, { _id: 1 });
             count = groupClients.length;
             clientIds = groupClients.map(client => client._id);
@@ -210,8 +211,9 @@ exports.createCampaignUtility = async (req, res, folder) => {
 
           case "group":
             const groupArray = obj.groups.split(',').map(groupId => groupId.trim());
-            const groupRegex = new RegExp(groupArray.map(groupId => `(^|,)${groupId}(,|$)`).join('|'));
-
+            const groupRegex = new RegExp(
+              groupArray.map(groupId => `(^|,\\s*)${groupId}(,|\\s*|$)`).join('|')
+            );
             const groupClients = await CLIENT_MODULE.find({ groupId: groupRegex, isDeleted: false }, { _id: 1 });
             count = groupClients.length;
             clientIds = groupClients.map(client => client._id);
@@ -413,15 +415,11 @@ exports.campaignAudienceCount = async (req, res) => {
 
       case "group":
         const groupArray = groups.split(',').map(groupId => groupId.trim());
-        const groupRegex = new RegExp(`(^|,)(${groupArray.join('|')})(,|$)`);
-        const groupClients = await CLIENT_MODULE.find(
-          {
-            groupId: { $regex: groupRegex },
-            isDeleted: false
-          },
-          { _id: 1 }
+        const groupRegex = new RegExp(
+          groupArray.map(groupId => `(^|,\\s*)${groupId}(,|\\s*|$)`).join('|')
         );
-        count = groupClients.length;
+        const groupClients = await CLIENT_MODULE.find({ groupId: groupRegex, isDeleted: false }, { _id: 1 });
+        count = await groupClients.length;
         break;
 
       case "favoriteContacts":
@@ -433,7 +431,7 @@ exports.campaignAudienceCount = async (req, res) => {
         break;
     }
     res.status(200).send({ message: CONSTANT.MESSAGE.FOUND_SUCCESSFULLY, data: count })
-  } catch (error) {
+  } catch (err) {
     return res.status(500).send({
       message: err.message || CONSTANT.MESSAGE.ERROR_OCCURRED,
     });
@@ -850,13 +848,26 @@ const stripHtmlTags = (htmlContent) => {
 
 const sendMarketingWhatsAppMessages = async (mobileNumbers, images, _id, caption, messageType, documentType) => {
   try {
+    const processedNumbers = new Set();
     for (const mobileNumber of mobileNumbers) {
+      if (processedNumbers.has(mobileNumber)) {
+        console.log(`Skipping already processed number: ${mobileNumber}`);
+        continue;
+      }
+
       try {
         const messageData = await prepareMessageData(mobileNumber, images, caption, documentType);
-        await whatsappAPISend(messageData, _id, messageType, caption);
-        continue;
+        const isSuccess = await whatsappAPISend(messageData, _id, messageType, caption);
+        if (isSuccess) {
+          console.log(`Message sent successfully to: ${mobileNumber}`);
+        } else {
+          console.log(`Message failed to send to: ${mobileNumber}`);
+        }
+
+        processedNumbers.add(mobileNumber);
       } catch (error) {
         console.log(`Failed to send message to ${mobileNumber} : `, error);
+        processedNumbers.add(mobileNumber);
       }
     };
   } catch (error) {
@@ -914,7 +925,13 @@ const prepareMessageData = (mobileNumber, images, caption, documentType) => {
 
 const sendTextWhatsAppMessages = async (mobileNumbers, _id, caption, messageType) => {
   try {
+    const processedNumbers = new Set();
     for (const mobileNumber of mobileNumbers) {
+      if (processedNumbers.has(mobileNumber)) {
+        console.log(`Skipping already processed number: ${mobileNumber}`);
+        continue;
+      }
+
       try {
         const messageData = {
           messaging_product: "whatsapp",
@@ -933,10 +950,17 @@ const sendTextWhatsAppMessages = async (mobileNumbers, _id, caption, messageType
           },
         };
 
-        await whatsappAPISend(messageData, _id, messageType, caption);
-        continue;
+        const isSuccess = await whatsappAPISend(messageData, _id, messageType, caption);
+        if (isSuccess) {
+          console.log(`Message sent successfully to: ${mobileNumber}`);
+        } else {
+          console.log(`Message failed to send to: ${mobileNumber}`);
+        }
+
+        processedNumbers.add(mobileNumber);
       } catch (error) {
         console.log(`Failed to send message to ${mobileNumber}:`, error);
+        processedNumbers.add(mobileNumber);
       }
     }
   } catch (error) {
@@ -1005,7 +1029,7 @@ const editUtilityImage = async ({
         textDecoration = 'none', // Default text decoration
         fillColor = 'black', // Default text color
         textAlign = 'center', // Default text alignment
-        textBaseline = 'center', // Default text baseline
+        textBaseline = 'middle', // Default text baseline
       } = layer;
 
       if (type === 'text') {
@@ -1050,11 +1074,10 @@ const editUtilityImage = async ({
                     logoWidth = (originalWidth / originalHeight) * logoHeight;
                   }
 
-                  if (logoHeight !== 140) {
-                    logoHeight = 160;
-                    logoWidth = (originalWidth / originalHeight) * logoHeight;
-                  }
-
+                  // if (logoHeight !== 140) {
+                  //   logoHeight = 160;
+                  //   logoWidth = (originalWidth / originalHeight) * logoHeight;
+                  // }
                   const drawX = calculatedx - logoWidth / 2;
                   const drawY = calculatedy - logoHeight / 2;
 
@@ -1072,7 +1095,6 @@ const editUtilityImage = async ({
 
           updatedContent = updatedContent.replace(/logo/i, '');
         }
-
 
         ctx.font = `${fontWeight} ${fontStyle} ${parseFloat(size)}px ${fontFamily}`;
         ctx.fillStyle = fillColor;
@@ -1122,7 +1144,13 @@ const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, 
       console.log("Template not found");
     }
 
+    const processedNumbers = new Set();
     for (const mobileNumber of mobileNumbers) {
+      if (processedNumbers.has(mobileNumber)) {
+        console.log(`Skipping already processed number: ${mobileNumber}`);
+        continue;
+      }
+
       try {
         const user = await CLIENT_MODULE.find({ whatsapp_number: mobileNumber });
         if (!user || user.length === 0) {
@@ -1176,10 +1204,17 @@ const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, 
           },
         };
 
-        await whatsappAPISend(messageData, _id, messageType, caption);
-        continue;
+        const isSuccess = await whatsappAPISend(messageData, _id, messageType, caption);
+        if (isSuccess) {
+          console.log(`Message sent successfully to: ${mobileNumber}`);
+        } else {
+          console.log(`Message failed to send to: ${mobileNumber}`);
+        }
+
+        processedNumbers.add(mobileNumber);
       } catch (error) {
         console.log(`Failed to process mobile number ${mobileNumber}:`, error);
+        processedNumbers.add(mobileNumber);
       }
     }
     if (_id) {
@@ -1218,9 +1253,12 @@ const whatsappAPISend = async (messageData, _id, messageType, caption) => {
 
     if (!Array.isArray(data.contacts) || !Array.isArray(data.messages) || !data.contacts.length || !data.messages.length) {
       console.error(`Invalid Whatsapp API response structure`,);
-      await CAMPAIGN_MODULE.findByIdAndUpdate(_id, {
-        $push: { unproceedNumbers: messageData.to }
-      }, { new: true });
+      await CAMPAIGN_MODULE.findByIdAndUpdate(_id,
+        {
+          $push: { unproceedNumbers: messageData.to }
+        },
+        { new: true }
+      );
       return false;
     }
 
