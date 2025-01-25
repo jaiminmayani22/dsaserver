@@ -498,22 +498,21 @@ exports.getAllClient = async (req, res) => {
     pageCount,
     search,
     sortingField,
-    sortingOrder,
+    sortingOrder = "desc",
     filter,
   } = req.body;
+
   let query = {
     isDeleted: false,
   };
   try {
     const searchTerm = search || "";
-    const filterDate = Object.assign({}, filter);
-    const sortOrder =
-      sortingOrder && sortingOrder == CONSTANT.COMMON.DESC ? -1 : 1;
-    const sortField = sortingField || CONSTANT.FIELD.NAME;
+    const sortOrder = sortingOrder && sortingOrder === CONSTANT.COMMON.DESC ? -1 : 1;
+    const sortField = sortingField || "createdAt";
 
     const pageSize = parseInt(limit);
     const pageNo = parseInt(pageCount);
-    const skip = pageSize * pageNo;
+    const skip = pageSize * (pageNo - 1);
 
     if (searchTerm) {
       const searchTerms = {
@@ -525,71 +524,25 @@ exports.getAllClient = async (req, res) => {
           {
             $or: [
               { name: searchTerms },
+              { company_name: searchTerms },
               { email: searchTerms },
               { mobile_number: searchTerms },
+              { whatsapp_number: searchTerms },
               { groupName: searchTerms },
-              { groupId: searchTerms },
+              { city: searchTerms },
+              { district: searchTerms },
             ],
           },
         ],
       };
     }
 
-    if (filterDate) {
-      const fromDate = filterDate.fromDate;
-      const toDate = filterDate.toDate;
-      if (fromDate && !toDate) {
-        query = {
-          ...query,
-          $expr: {
-            $and: [
-              {
-                $eq: [
-                  {
-                    $dateToString: { format: "%Y-%m-%d", date: "$updatedAt" },
-                  },
-                  fromDate,
-                ],
-              },
-            ],
-          },
-        };
+    if (filter) {
+      if (filter.isFavorite !== undefined) {
+        query.isFavorite = filter.isFavorite;
       }
-      if (!fromDate && toDate) {
-        query = {
-          ...query,
-          $expr: {
-            $and: [
-              {
-                $eq: [
-                  { $dateToString: { format: "%Y-%m-%d", date: "$updatedAt" } },
-                  toDate,
-                ],
-              },
-            ],
-          },
-        };
-      }
-      if (fromDate && toDate) {
-        query = {
-          ...query,
-          $expr: {
-            $and: [
-              {
-                $gte: [
-                  { $dateToString: { format: "%Y-%m-%d", date: "$updatedAt" } },
-                  fromDate,
-                ],
-              },
-              {
-                $lte: [
-                  { $dateToString: { format: "%Y-%m-%d", date: "$updatedAt" } },
-                  toDate,
-                ],
-              },
-            ],
-          },
-        };
+      if (filter.isNumberOnWhatsapp !== undefined) {
+        query.isNumberOnWhatsapp = filter.isNumberOnWhatsapp;
       }
     }
 
@@ -598,17 +551,15 @@ exports.getAllClient = async (req, res) => {
       .sort({ [sortField]: sortOrder })
       .skip(skip)
       .limit(pageSize);
-    if (clients.length > 0) {
-      res.status(200).json({
-        message: CONSTANT.MESSAGE.DATA_FOUND,
-        totalRecords: count,
-        data: clients,
-      });
-    } else {
-      res.status(404).json({
-        message: CONSTANT.MESSAGE.DATA_NOT_FOUND,
-      });
-    }
+    const totalPages = Math.ceil(count / pageSize);
+    res.status(200).json({
+      message: CONSTANT.MESSAGE.DATA_FOUND,
+      pageSize: pageSize,
+      pageNo: pageNo,
+      totalPages: totalPages,
+      totalRecords: count,
+      data: clients,
+    });
   } catch (err) {
     res
       .status(500)
@@ -1205,7 +1156,7 @@ exports.exportClientToCSV = async (req, res) => {
       query.whatsapp_number = { $in: numbers };
     }
 
-    const clients = await CLIENT_COLLECTION.find(query);
+    const clients = await CLIENT_COLLECTION.find(query).sort({ createdAt: -1 });
     const processedClients = clients.map(client => ({
       ...client._doc,
       mobile_number: client.mobile_number ? `'${client.mobile_number}` : "",
