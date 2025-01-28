@@ -848,26 +848,23 @@ const stripHtmlTags = (htmlContent) => {
 
 const sendMarketingWhatsAppMessages = async (mobileNumbers, images, _id, caption, messageType, documentType) => {
   try {
-    const processedNumbers = new Set();
     for (const mobileNumber of mobileNumbers) {
-      if (processedNumbers.has(mobileNumber)) {
-        console.log(`Skipping already processed number: ${mobileNumber}`);
-        continue;
-      }
-
       try {
         const messageData = await prepareMessageData(mobileNumber, images, caption, documentType);
+        if (!messageData) {
+          console.error(`Failed to prepare payload for mobile number: ${mobileNumber}`);
+          continue;
+        }
+
         const isSuccess = await whatsappAPISend(messageData, _id, messageType, caption);
         if (isSuccess) {
           console.log(`Message sent successfully to: ${mobileNumber}`);
         } else {
-          console.log(`Message failed to send to: ${mobileNumber}`);
+          console.error(`Failed to send message to: ${mobileNumber}`);
+          continue;
         }
-
-        processedNumbers.add(mobileNumber);
       } catch (error) {
         console.log(`Failed to send message to ${mobileNumber} : `, error);
-        processedNumbers.add(mobileNumber);
       }
     };
   } catch (error) {
@@ -1234,7 +1231,16 @@ const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, 
 
 const whatsappAPISend = async (messageData, _id, messageType, caption) => {
   try {
-    await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { $inc: { process: 1 } }, { new: true });
+    const existingLog = await MESSAGE_LOG.findOne({
+      camId: _id,
+      mobileNumber: messageData.to,
+      msgType: messageType,
+    });
+
+    if (existingLog) {
+      console.log(`Message already sent to ${messageData.to} for campaign ${_id}, skipping.`);
+      return false;
+    }
 
     const response = await fetch(process.env.WHATSAPP_API_URL, {
       method: 'POST',
@@ -1246,23 +1252,32 @@ const whatsappAPISend = async (messageData, _id, messageType, caption) => {
     });
 
     const data = await response.json();
-    if (!response.ok) {
-      console.log(`WhatsApp API Error : ${data.message || 'Unknown error'}`);
-      // return false;
-    }
-
-    if (!Array.isArray(data.contacts) || !Array.isArray(data.messages) || !data.contacts.length || !data.messages.length) {
-      console.error(`Invalid Whatsapp API response structure`,);
-      await CAMPAIGN_MODULE.findByIdAndUpdate(_id,
-        {
-          $push: { unproceedNumbers: messageData.to }
-        },
-        { new: true }
+    if (!response.ok || (!Array.isArray(data.contacts) || !Array.isArray(data.messages) || !data.contacts.length || !data.messages.length)) {
+      console.error(
+        `WhatsApp API Error (Campaign ${_id}): ${data.message || 'Unknown error'}`
       );
+      try {
+        await CAMPAIGN_MODULE.findByIdAndUpdate(
+          _id,
+          { $push: { unproceedNumbers: messageData.to } },
+          { new: true }
+        );
+      } catch (error) {
+        console.error(
+          `Error updating unproceedNumbers for campaign ${_id}:`,
+          error.message
+        );
+      }
       return false;
     }
+    
+    try {
+      await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { $inc: { process: 1 } }, { new: true });
+    } catch (error) {
+      console.error(`Error updating process count for campaign ${_id}:`, error.message);
+    }
 
-    const obj = {
+    const logEntry = {
       camId: _id,
       mobileNumber: data.contacts?.[0]?.input,
       waMessageId: data.messages?.[0]?.id,
@@ -1273,34 +1288,36 @@ const whatsappAPISend = async (messageData, _id, messageType, caption) => {
 
     try {
       const existingLog = await MESSAGE_LOG.findOne({
-        camId: obj.camId,
-        mobileNumber: obj.mobileNumber,
-        waMessageId: obj.waMessageId,
-        msgType: obj.msgType,
+        camId: logEntry.camId,
+        mobileNumber: logEntry.mobileNumber,
+        waMessageId: logEntry.waMessageId,
+        msgType: logEntry.msgType,
       });
+
       if (existingLog) {
         await MESSAGE_LOG.updateOne(
           { _id: existingLog._id },
           {
             $set: {
-              status: obj.status,
-              messageTitle: obj.messageTitle,
+              status: logEntry.status,
+              messageTitle: logEntry.messageTitle,
             },
           },
           { new: true }
         );
       } else {
-        await MESSAGE_LOG.create({
-          ...obj
-        });
+        await MESSAGE_LOG.create(logEntry);
       }
       return true;
     } catch (error) {
-      console.log("Error updating or creating message log : ", error.message);
+      console.error(
+        `Error updating or creating message log for campaign ${_id}, number: ${logEntry.mobileNumber}`,
+        error.message
+      );
       return false;
     }
   } catch (error) {
-    console.log(`Failed to send message for campaign ${_id} : `, error.message || error);
+    console.error(`Error in whatsappAPISend for campaign ${_id}:`, error.message || error);
     return false;
   }
 };
