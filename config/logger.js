@@ -1,5 +1,12 @@
 const winston = require("winston");
 const config = require("config");
+const path = require("path");
+const fs = require("fs");
+
+const logDir = path.join(__dirname, "../logs");
+if (!fs.existsSync(logDir)) {
+  fs.mkdirSync(logDir, { recursive: true });
+}
 
 const logger = winston.createLogger({
   level: config.get("STATUS").INFO,
@@ -11,10 +18,10 @@ const logger = winston.createLogger({
     new winston.transports.Console(),
 
     new winston.transports.File({
-      filename: 'logs/server.log',
+      filename: `${logDir}/${new Date().toISOString().split('T')[0]}.log`, // Creates a log file named by the current date (e.g., 2025-01-28.log)
       format: winston.format.combine(
         winston.format.timestamp({ format: 'MMM-DD-YYYY HH:mm:ss' }),
-        winston.format.align(),
+        // winston.format.align(),
         winston.format.printf(info => `${info.level} : ${[info.timestamp]} :  ${info.message} :  ${info.request_params || ""}`),
       )
     }),
