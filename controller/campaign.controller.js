@@ -1061,7 +1061,7 @@ const editUtilityImage = async ({
         for (const key of sortedKeys) {
           const value = replacements[key];
           const regex = new RegExp(key, 'i');
-          updatedContent = updatedContent.replace(regex, value);
+          updatedContent = updatedContent.replace(regex, value) || updatedContent;
         }
 
         if (/logo/i.test(content)) {
@@ -1338,7 +1338,7 @@ const whatsappAPISend = async (messageData, _id, messageType, caption) => {
 
 exports.getMessagesForCampaign = async (req, res) => {
   try {
-    const { _id: campaignId, pageSize = 10, pageNo = 1, filter } = req.body;
+    const { _id: campaignId } = req.body;
 
     if (!campaignId) {
       return res.status(400).json({
@@ -1347,56 +1347,9 @@ exports.getMessagesForCampaign = async (req, res) => {
       });
     }
 
-    const limit = parseInt(pageSize);
-    const skip = (parseInt(pageNo) - 1) * limit;
-    const query = { camId: campaignId, isDeleted: false };
-
-    if (filter) {
-      if (filter.status === "read" || filter.status === "delivered" || filter.status === "sent" || filter.status === "accepted") {
-        query.status = filter.status;
-      }
-      if (filter.status === "failed") {
-        query.status = "failed";
-        query.reason = {
-          $nin: [
-            "Failed to send message because this user's phone number is part of an experiment",
-            "Message Undeliverable."
-          ]
-        };
-      }
-      if (filter.status === "unavailable") {
-        query.status = "failed";
-        query.reason = "Message Undeliverable.";
-      }
-      if (filter.status === "experiment") {
-        query.status = "failed";
-        query.reason = "Failed to send message because this user's phone number is part of an experiment";
-      }
-    }
-
-    const totalData = await MESSAGE_LOG.countDocuments(query);
-    const totalLogs = await MESSAGE_LOG.countDocuments({ camId: campaignId, isDeleted: false });
-    const success = await MESSAGE_LOG.countDocuments({
-      camId: campaignId, isDeleted: false, status: { $in: ["sent", "delivered", "read"] }
-    });
-
     const logs = await MESSAGE_LOG.aggregate([
       {
-        $match: query,
-      },
-      {
-        $lookup: {
-          from: "clients",
-          localField: "mobileNumber",
-          foreignField: "whatsapp_number",
-          as: "clientInfo",
-        },
-      },
-      {
-        $unwind: {
-          path: "$clientInfo",
-          preserveNullAndEmptyArrays: true,
-        },
+        $match: { camId: campaignId, isDeleted: false },
       },
       {
         $group: {
@@ -1408,6 +1361,29 @@ exports.getMessagesForCampaign = async (req, res) => {
         $replaceRoot: { newRoot: "$latestLog" },
       },
       {
+        $lookup: {
+          from: "clients",
+          let: { mobileNum: "$mobileNumber" },
+          pipeline: [
+            {
+              $match: {
+                $expr: { $eq: ["$whatsapp_number", "$$mobileNum"] },
+              },
+            },
+            {
+              $project: { name: 1 },
+            },
+          ],
+          as: "clientInfo",
+        },
+      },
+      {
+        $unwind: {
+          path: "$clientInfo",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      {
         $project: {
           _id: 1,
           camId: 1,
@@ -1417,85 +1393,16 @@ exports.getMessagesForCampaign = async (req, res) => {
           reason: 1,
           msgType: 1,
           messageTitle: 1,
-          isDeleted: 1,
           createdAt: 1,
           updatedAt: 1,
           clientName: "$clientInfo.name",
         },
       },
-      { $skip: skip },
-      { $limit: limit },
     ]);
-
-    const statusData = await MESSAGE_LOG.aggregate([
-      {
-        $match: { camId: campaignId, isDeleted: false },
-      },
-      {
-        $group: {
-          _id: {
-            status: "$status",
-            reason: "$reason",
-          },
-          count: { $sum: 1 },
-        },
-      },
-      {
-        $project: {
-          status: "$_id.status",
-          reason: "$_id.reason",
-          count: 1,
-        },
-      },
-    ]);
-
-    const formattedStatusData = {
-      read: 0,
-      delivered: 0,
-      sent: 0,
-      accepted: 0,
-      failed: 0,
-      unavailable: 0,
-      experiment: 0,
-    };
-
-    statusData.forEach((item) => {
-      if (item.status === "read") formattedStatusData.read += item.count;
-      else if (item.status === "delivered") formattedStatusData.delivered += item.count;
-      else if (item.status === "sent") formattedStatusData.sent += item.count;
-      else if (item.status === "accepted") formattedStatusData.accepted += item.count;
-      else if (
-        item.status === "failed" &&
-        item.reason === "Message Undeliverable."
-      ) {
-        formattedStatusData.unavailable += item.count;
-      } else if (
-        item.status === "failed" &&
-        item.reason ===
-        "Failed to send message because this user's phone number is part of an experiment"
-      ) {
-        formattedStatusData.experiment += item.count;
-      } else if (item.status === "failed" &&
-        item.reason !== "Failed to send message because this user's phone number is part of an experiment" &&
-        item.reason !== "Message Undeliverable.") {
-        formattedStatusData.failed += item.count;
-      }
-    });
-
-    const totalPages = Math.ceil(totalData / limit);
 
     return res.status(200).json({
       message: CONSTANT.MESSAGE.DATA_FOUND_SUCCESSFULLY,
-      pageSize: limit,
-      pageNo: parseInt(pageNo),
-      totalPages: totalPages,
-      totalRecords: totalLogs,
-      totalData: totalData,
-      success: success,
-      data: {
-        statusData: formattedStatusData,
-        data: logs,
-      },
+      data: logs,
     });
   } catch (error) {
     return res.status(500).json({

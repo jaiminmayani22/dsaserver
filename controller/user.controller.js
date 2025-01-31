@@ -510,8 +510,8 @@ exports.getAllClient = async (req, res) => {
     const sortOrder = sortingOrder && sortingOrder === CONSTANT.COMMON.DESC ? -1 : 1;
     const sortField = sortingField || "createdAt";
 
-    const pageSize = parseInt(limit);
-    const pageNo = parseInt(pageCount);
+    const pageSize = parseInt(limit) || 10;
+    const pageNo = parseInt(pageCount)|| 1;
     const skip = pageSize * (pageNo - 1);
 
     if (searchTerm) {

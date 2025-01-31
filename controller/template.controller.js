@@ -222,7 +222,7 @@ exports.getAllTemplateImages = async (req, res) => {
     });
   } else {
     try {
-      await TEMPLATE_IMAGES_MODULE.find({ isDeleted: false }).then((response) => {
+      await TEMPLATE_IMAGES_MODULE.find({ isDeleted: false }).sort({ createdAt: -1 }).then((response) => {
         return res.status(200).send(response)
       })
         .catch((err) => {
@@ -248,7 +248,7 @@ exports.getAllTemplateFormat = async (req, res) => {
     });
   } else {
     try {
-      await TEMPLATE_FORMAT_MODULE.find({ isDeleted: false }).then((response) => {
+      await TEMPLATE_FORMAT_MODULE.find({ isDeleted: false }).sort({ createdAt: -1 }).then((response) => {
         return res.status(200).send(response)
       })
         .catch((err) => {
@@ -274,7 +274,7 @@ exports.getAllReferenceTemplateFormat = async (req, res) => {
     });
   } else {
     try {
-      await TEMPLATE_REFERENCE_FORMAT_MODULE.find({ isDeleted: false }).then((response) => {
+      await TEMPLATE_REFERENCE_FORMAT_MODULE.find({ isDeleted: false }).sort({ createdAt: -1 }).then((response) => {
         return res.status(200).send(response)
       })
         .catch((err) => {
@@ -581,7 +581,7 @@ Topic: Get all Variables
 */
 exports.getAllVariables = async (req, res) => {
   try {
-    await VARIABLE_MODULE.find({ isDeleted: false }).then((response) => {
+    await VARIABLE_MODULE.find({ isDeleted: false }).sort({ createdAt: -1 }).then((response) => {
       return res.status(200).send(response)
     })
       .catch((err) => {
