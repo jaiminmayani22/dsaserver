@@ -515,29 +515,30 @@ exports.getCampaignById = async (req, res) => {
   } else {
     try {
       const _id = req.body._id;
-      await CAMPAIGN_MODULE.findById(_id)
-        .populate({
-          path: 'audienceIds',
-          model: 'clients',
-          select: 'whatsapp_number name'
-        })
-        .populate({
-          path: 'freezedAudienceIds',
-          model: 'clients',
-          select: 'whatsapp_number name'
-        })
-        .populate({
-          path: 'selectedRefTemplate',
-          model: 'templateReferenceFormat',
-        })
-        .then((response) => {
-          return res.status(200).send(response);
-        })
-        .catch((err) => {
-          return res.status(404).send({
-            message: err.message || CONSTANT.MESSAGE.ERROR_OCCURRED,
-          });
-        });
+      const campaign = await CAMPAIGN_MODULE.findById(_id).lean();
+
+      if (!campaign) {
+        return res.status(404).send({ message: "Campaign not found" });
+      }
+
+      const audienceIds = await CLIENT_MODULE.find({ _id: { $in: campaign.audienceIds } })
+        .select("whatsapp_number name")
+        .lean();
+
+      const freezedAudienceIds = await CLIENT_MODULE.find({ _id: { $in: campaign.freezedAudienceIds } })
+        .select("whatsapp_number name")
+        .lean();
+
+      const selectedRefTemplate = await REF_TEMPLATE_MODULE.findById(campaign.selectedRefTemplate).lean();
+
+      const populatedCampaign = {
+        ...campaign,
+        audienceIds,
+        freezedAudienceIds,
+        selectedRefTemplate,
+      };
+
+      return res.status(200).send(populatedCampaign);
     } catch (err) {
       return res.status(500).send({
         message: err.message || CONSTANT.MESSAGE.ERROR_OCCURRED,
@@ -1347,62 +1348,90 @@ exports.getMessagesForCampaign = async (req, res) => {
       });
     }
 
-    const logs = await MESSAGE_LOG.aggregate([
-      {
-        $match: { camId: campaignId, isDeleted: false },
-      },
-      {
-        $group: {
-          _id: { camId: "$camId", mobileNumber: "$mobileNumber" },
-          latestLog: { $first: "$$ROOT" },
-        },
-      },
-      {
-        $replaceRoot: { newRoot: "$latestLog" },
-      },
-      {
-        $lookup: {
-          from: "clients",
-          let: { mobileNum: "$mobileNumber" },
-          pipeline: [
-            {
-              $match: {
-                $expr: { $eq: ["$whatsapp_number", "$$mobileNum"] },
-              },
-            },
-            {
-              $project: { name: 1 },
-            },
-          ],
-          as: "clientInfo",
-        },
-      },
-      {
-        $unwind: {
-          path: "$clientInfo",
-          preserveNullAndEmptyArrays: true,
-        },
-      },
-      {
-        $project: {
-          _id: 1,
-          camId: 1,
-          mobileNumber: 1,
-          waMessageId: 1,
-          status: 1,
-          reason: 1,
-          msgType: 1,
-          messageTitle: 1,
-          createdAt: 1,
-          updatedAt: 1,
-          clientName: "$clientInfo.name",
-        },
-      },
-    ]);
+    // const logs = await MESSAGE_LOG.aggregate([
+    //   {
+    //     $match: { camId: campaignId, isDeleted: false },
+    //   },
+    //   {
+    //     $group: {
+    //       _id: { camId: "$camId", mobileNumber: "$mobileNumber" },
+    //       latestLog: { $first: "$$ROOT" },
+    //     },
+    //   },
+    //   {
+    //     $replaceRoot: { newRoot: "$latestLog" },
+    //   },
+    //   {
+    //     $lookup: {
+    //       from: "clients",
+    //       let: { mobileNum: "$mobileNumber" },
+    //       pipeline: [
+    //         {
+    //           $match: {
+    //             $expr: { $eq: ["$whatsapp_number", "$$mobileNum"] },
+    //           },
+    //         },
+    //         {
+    //           $project: { name: 1 },
+    //         },
+    //       ],
+    //       as: "clientInfo",
+    //     },
+    //   },
+    //   {
+    //     $unwind: {
+    //       path: "$clientInfo",
+    //       preserveNullAndEmptyArrays: true,
+    //     },
+    //   },
+    //   {
+    //     $project: {
+    //       _id: 1,
+    //       camId: 1,
+    //       mobileNumber: 1,
+    //       waMessageId: 1,
+    //       status: 1,
+    //       reason: 1,
+    //       msgType: 1,
+    //       messageTitle: 1,
+    //       createdAt: 1,
+    //       updatedAt: 1,
+    //       clientName: "$clientInfo.name",
+    //     },
+    //   },
+    // ]);
+
+    const logs = await MESSAGE_LOG.find({ camId: campaignId, isDeleted: false })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const uniqueLogs = new Map();
+
+    logs.forEach((log) => {
+      const key = `${log.camId}-${log.mobileNumber}`;
+      if (!uniqueLogs.has(key)) {
+        uniqueLogs.set(key, log);
+      }
+    });
+
+    const latestLogs = Array.from(uniqueLogs.values());
+
+    const mobileNumbers = latestLogs.map((log) => log.mobileNumber);
+
+    const clients = await CLIENT_MODULE.find({ isDeleted: false, whatsapp_number: { $in: mobileNumbers } })
+      .select("whatsapp_number name")
+      .lean();
+
+    const clientLookup = new Map(clients.map(client => [client.whatsapp_number, client.name]));
+
+    const finalLogs = latestLogs.map(log => ({
+      ...log,
+      clientName: clientLookup.get(log.mobileNumber) || null,
+    }));
 
     return res.status(200).json({
       message: CONSTANT.MESSAGE.DATA_FOUND_SUCCESSFULLY,
-      data: logs,
+      data: finalLogs,
     });
   } catch (error) {
     return res.status(500).json({
