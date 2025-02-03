@@ -143,7 +143,7 @@ async function updateWhatsappStatuses(data) {
                                 continue;
                             }
 
-                            if (["sent"].includes(status.status)) {
+                            if (["sent"].includes(status.status) && !["read", "delivered", "sent"].includes(updatedData.status)) {
                                 try {
                                     if (!updatedData.camId) {
                                         console.error("Invalid camId:", updatedData.camId);

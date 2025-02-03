@@ -1276,12 +1276,6 @@ const whatsappAPISend = async (messageData, _id, messageType, caption) => {
       return false;
     }
 
-    try {
-      await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { $inc: { process: 1 } }, { new: true });
-    } catch (error) {
-      console.error(`Error updating process count for campaign ${_id}:`, error.message);
-    }
-
     const logEntry = {
       camId: _id,
       mobileNumber: data.contacts?.[0]?.input,
@@ -1312,6 +1306,11 @@ const whatsappAPISend = async (messageData, _id, messageType, caption) => {
         );
       } else {
         await MESSAGE_LOG.create(logEntry);
+        try {
+          await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { $inc: { process: 1 } }, { new: true });
+        } catch (error) {
+          console.error(`Error updating process count for campaign ${_id}:`, error.message);
+        }
       }
       return true;
     } catch (error) {
