@@ -1240,6 +1240,7 @@ const whatsappAPISend = async (messageData, _id, messageType, caption) => {
       camId: _id,
       mobileNumber: messageData.to,
       msgType: messageType,
+      status: { $in: ["sent", "delivered", "read", "accepted", "failed"] },
     });
 
     if (existingLog) {
