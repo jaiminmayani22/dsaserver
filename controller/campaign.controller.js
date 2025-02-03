@@ -1391,21 +1391,21 @@ exports.getMessagesForCampaign = async (req, res) => {
     // ]);
 
     const logs = await MESSAGE_LOG.find({ camId: campaignId, isDeleted: false })
-      .sort({ createdAt: -1 })
+      .sort({ updatedAt: -1 })
       .lean();
 
-    const uniqueLogs = new Map();
+    const uniqueLogs = [];
+    const seenKeys = new Set();
 
     logs.forEach((log) => {
       const key = `${log.camId}-${log.mobileNumber}`;
-      if (!uniqueLogs.has(key)) {
-        uniqueLogs.set(key, log);
+      if (!seenKeys.has(key)) {
+        seenKeys.add(key);
+        uniqueLogs.push(log);
       }
     });
 
-    const latestLogs = Array.from(uniqueLogs.values());
-
-    const mobileNumbers = latestLogs.map((log) => log.mobileNumber);
+    const mobileNumbers = uniqueLogs.map((log) => log.mobileNumber);
 
     const clients = await CLIENT_MODULE.find({ isDeleted: false, whatsapp_number: { $in: mobileNumbers } })
       .select("whatsapp_number name")
@@ -1413,7 +1413,7 @@ exports.getMessagesForCampaign = async (req, res) => {
 
     const clientLookup = new Map(clients.map(client => [client.whatsapp_number, client.name]));
 
-    const finalLogs = latestLogs.map(log => ({
+    const finalLogs = uniqueLogs.map(log => ({
       ...log,
       clientName: clientLookup.get(log.mobileNumber) || null,
     }));
