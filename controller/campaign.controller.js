@@ -757,11 +757,16 @@ const sendInstantMessage = async (req, res, cron) => {
 
     if (messageType === 'marketing' && imageUrl) {
       try {
-        await sendMarketingWhatsAppMessages(mobileNumbers, imageUrl, _id, caption, messageType, documentType);
-        if (cron !== true && res) {
-          return res.status(200).json({ message: `${CONSTANT.COLLECTION.CAMPAIGN} ${CONSTANT.MESSAGE.CREATE_SENT_SUCCESSFULLY}` });
+        const sendSuccess = await sendMarketingWhatsAppMessages(mobileNumbers, imageUrl, _id, caption, messageType, documentType);
+        if (sendSuccess) {
+          if (cron !== true && res) {
+            return res.status(200).json({ message: `${CONSTANT.COLLECTION.CAMPAIGN} ${CONSTANT.MESSAGE.CREATE_SENT_SUCCESSFULLY}` });
+          } else {
+            console.log("Campaign sent succesfully : ", _id, caption);
+            return;
+          }
         } else {
-          console.log("Campaign sent succesfully : ", _id, caption);
+          console.warn("Message sent but not confirmed for campaign:", req.body.name);
           return;
         }
       } catch (error) {
@@ -778,7 +783,6 @@ const sendInstantMessage = async (req, res, cron) => {
     if (messageType === 'utility' && imageUrl) {
       try {
         const sendSuccess = await sendUtilityWhatsAppMessages(mobileNumbers, imageUrl, _id, caption, selectedRefTemplate, messageType);
-
         if (sendSuccess) {
           if (cron !== true && res) {
             return res.status(200).json({ message: `${CONSTANT.COLLECTION.CAMPAIGN} ${CONSTANT.MESSAGE.CREATE_SENT_SUCCESSFULLY}` });
@@ -803,11 +807,16 @@ const sendInstantMessage = async (req, res, cron) => {
 
     if (!imageUrl && caption) {
       try {
-        await sendTextWhatsAppMessages(mobileNumbers, _id, caption, messageType);
-        if (cron !== true && res) {
-          return res.status(200).json({ message: `${CONSTANT.COLLECTION.CAMPAIGN} ${CONSTANT.MESSAGE.CREATE_SENT_SUCCESSFULLY}` });
+        const sendSuccess = await sendTextWhatsAppMessages(mobileNumbers, _id, caption, messageType);
+        if (sendSuccess) {
+          if (cron !== true && res) {
+            return res.status(200).json({ message: `${CONSTANT.COLLECTION.CAMPAIGN} ${CONSTANT.MESSAGE.CREATE_SENT_SUCCESSFULLY}` });
+          } else {
+            console.log("Campaign sent successfully : ", _id, caption);
+            return;
+          }
         } else {
-          console.log("Campaign sent successfully : ", _id, caption);
+          console.warn("Message sent but not confirmed for campaign:", req.body.name);
           return;
         }
       } catch (error) {
@@ -862,7 +871,7 @@ const sendMarketingWhatsAppMessages = async (mobileNumbers, images, _id, caption
   try {
     for (const mobileNumber of mobileNumbers) {
       try {
-        const messageData = await prepareMessageData(mobileNumber, images, caption, documentType);
+        const messageData = prepareMessageData(mobileNumber, images, caption, documentType);
         if (!messageData) {
           console.error(`Failed to prepare payload for mobile number: ${mobileNumber}`);
           continue;
@@ -873,15 +882,11 @@ const sendMarketingWhatsAppMessages = async (mobileNumbers, images, _id, caption
           console.log(`Message sent successfully to: ${mobileNumber}`);
         } else {
           console.error(`Failed to send message to: ${mobileNumber}`);
-          continue;
         }
       } catch (error) {
         console.log(`Failed to send message to ${mobileNumber} : `, error);
       }
     };
-  } catch (error) {
-    console.log(`Error in sending WhatsApp messages for campaign ${_id} : `, error);
-  } finally {
     if (_id) {
       try {
         await updateCampaignStatus(_id, "completed");
@@ -891,6 +896,9 @@ const sendMarketingWhatsAppMessages = async (mobileNumbers, images, _id, caption
     } else {
       console.log("Warning: Cannot update campaign status because _id is undefined.");
     }
+    return true;
+  } catch (error) {
+    console.log(`Error in sending WhatsApp messages for campaign ${_id} : `, error);
   }
 };
 
@@ -934,13 +942,7 @@ const prepareMessageData = (mobileNumber, images, caption, documentType) => {
 
 const sendTextWhatsAppMessages = async (mobileNumbers, _id, caption, messageType) => {
   try {
-    const processedNumbers = new Set();
     for (const mobileNumber of mobileNumbers) {
-      if (processedNumbers.has(mobileNumber)) {
-        console.log(`Skipping already processed number: ${mobileNumber}`);
-        continue;
-      }
-
       try {
         const messageData = {
           messaging_product: "whatsapp",
@@ -965,16 +967,10 @@ const sendTextWhatsAppMessages = async (mobileNumbers, _id, caption, messageType
         } else {
           console.log(`Message failed to send to: ${mobileNumber}`);
         }
-
-        processedNumbers.add(mobileNumber);
       } catch (error) {
         console.log(`Failed to send message to ${mobileNumber}:`, error);
-        processedNumbers.add(mobileNumber);
       }
-    }
-  } catch (error) {
-    console.log(`Error in sending WhatsApp messages for campaign ${_id}:`, error);
-  } finally {
+    };
     if (_id) {
       try {
         await updateCampaignStatus(_id, "completed");
@@ -984,6 +980,9 @@ const sendTextWhatsAppMessages = async (mobileNumbers, _id, caption, messageType
     } else {
       console.log("Warning: Cannot update campaign status because _id is undefined.");
     }
+    return true;
+  } catch (error) {
+    console.log(`Error in sending WhatsApp messages for campaign ${_id}:`, error);
   }
 };
 
@@ -1156,13 +1155,7 @@ const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, 
       console.log("Template not found");
     }
 
-    const processedNumbers = new Set();
     for (const mobileNumber of mobileNumbers) {
-      if (processedNumbers.has(mobileNumber)) {
-        console.log(`Skipping already processed number: ${mobileNumber}`);
-        continue;
-      }
-
       try {
         const user = await CLIENT_MODULE.find({ whatsapp_number: mobileNumber });
         if (!user || user.length === 0) {
@@ -1222,13 +1215,10 @@ const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, 
         } else {
           console.log(`Message failed to send to: ${mobileNumber}`);
         }
-
-        processedNumbers.add(mobileNumber);
       } catch (error) {
         console.log(`Failed to process mobile number ${mobileNumber}:`, error);
-        processedNumbers.add(mobileNumber);
       }
-    }
+    };
     if (_id) {
       try {
         await updateCampaignStatus(_id, "completed");
@@ -1479,7 +1469,7 @@ exports.removeDuplicateLogs = async (req, res) => {
       deletedCount += result.deletedCount;
     }
 
-    if(res){
+    if (res) {
       res.status(200).send({
         message: "Duplicate removal complete.",
         totalDuplicatesDeleted: deletedCount,
@@ -1487,7 +1477,7 @@ exports.removeDuplicateLogs = async (req, res) => {
     }
   } catch (error) {
     console.log("Error deleting duplicates:", error);
-    if(res){
+    if (res) {
       res.status(500).send({
         message: "Error deleting duplicates.",
         error: error.message,
