@@ -28,6 +28,7 @@ class eventCron {
             await CAMP_CTRL.sendMessage(mockReq, null, true);
           }
         }
+        await CAMP_CTRL.removeDuplicateLogs();
       } catch (error) {
         console.error("Error in cron job:", error);
       }

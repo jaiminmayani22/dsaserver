@@ -1463,7 +1463,7 @@ exports.removeDuplicateLogs = async (req, res) => {
       },
     ]);
 
-    if (duplicates.length === 0) {
+    if (duplicates.length === 0 && res) {
       return res.status(200).send({
         message: "No duplicates found. Table is already clean.",
       });
@@ -1479,15 +1479,19 @@ exports.removeDuplicateLogs = async (req, res) => {
       deletedCount += result.deletedCount;
     }
 
-    res.status(200).send({
-      message: "Duplicate removal complete.",
-      totalDuplicatesDeleted: deletedCount,
-    });
+    if(res){
+      res.status(200).send({
+        message: "Duplicate removal complete.",
+        totalDuplicatesDeleted: deletedCount,
+      });
+    }
   } catch (error) {
     console.log("Error deleting duplicates:", error);
-    res.status(500).send({
-      message: "Error deleting duplicates.",
-      error: error.message,
-    });
+    if(res){
+      res.status(500).send({
+        message: "Error deleting duplicates.",
+        error: error.message,
+      });
+    }
   }
 };
