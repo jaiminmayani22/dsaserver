@@ -132,7 +132,7 @@ async function updateWhatsappStatuses(data) {
                                 { $set: { status: status.status, reason: reason } },
                                 { new: true }
                             );
-
+                            
                             if (!updatedData) {
                                 console.log(`No MESSAGE_LOG entry found for waMessageId: ${status.id}`);
                                 continue;
@@ -143,7 +143,7 @@ async function updateWhatsappStatuses(data) {
                                 continue;
                             }
 
-                            if (!["read", "delivered", "sent"].includes(updatedData.status) && ["read", "delivered", "sent"].includes(status.status)) {
+                            if (!["read", "delivered", "sent"].includes(updatedData?.status) && status?.status === "sent") {
                                 try {
                                     if (!updatedData.camId) {
                                         console.error("Invalid camId:", updatedData.camId);

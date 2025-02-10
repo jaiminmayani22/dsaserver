@@ -510,9 +510,9 @@ exports.getAllClient = async (req, res) => {
     const sortOrder = sortingOrder && sortingOrder === CONSTANT.COMMON.DESC ? -1 : 1;
     const sortField = sortingField || "createdAt";
 
-    const pageSize = parseInt(limit) || 10;
-    const pageNo = parseInt(pageCount)|| 1;
-    const skip = pageSize * (pageNo - 1);
+    const pageSize = parseInt(limit) === 0 ? null : parseInt(limit) || 10;
+    const pageNo = parseInt(pageCount) || 1;
+    const skip = pageSize ? pageSize * (pageNo - 1) : 0;
 
     if (searchTerm) {
       const searchTerms = {
@@ -1412,29 +1412,27 @@ exports.createGroup = async (req, res) => {
 
 exports.addContactsToGroup = async (req, res) => {
   const { Ids, numbers, groupId } = req.body;
-
   try {
     const newGroupId = groupId.trim();
 
     const name = await GROUP_COLLECTION.findOne({ groupId: newGroupId, isDeleted: false });
     const results = [];
 
-    if (Ids !== null && numbers === null) {
+    if (Ids !== undefined && numbers === undefined) {
       for (const id of Ids) {
         const user = await CLIENT_COLLECTION.findOne({ _id: id, isDeleted: false });
+        
         if (!user) continue;
         const existingGroupIds = user.groupId && user.groupId !== CONSTANT.NULL_STRING
           ? user.groupId.split(',').map(id => id.trim())
           : [];
-
+        
         const mergedGroupIds = Array.from(new Set([...existingGroupIds, newGroupId])).join(', ');
-
         const existingGroupNames = user.groupName && user.groupName !== CONSTANT.NULL_STRING
           ? user.groupName.split(',').map(name => name.trim())
           : [];
 
         const mergedGroupNames = Array.from(new Set([...existingGroupNames, name.name])).join(', ');
-
         const updatedUser = await CLIENT_COLLECTION.findOneAndUpdate(
           { _id: id, isDeleted: false },
           {

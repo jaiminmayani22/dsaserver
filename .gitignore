@@ -6,3 +6,12 @@ logs
 /.env
 /.vscode
 .vscode
+/public/chat
+/public/clients_csv
+/public/company_profile_picture
+/public/profile_picture
+/public/schedule_marketing
+/public/schedule_utility
+/public/template-format
+/public/template-images
+/public/templates
