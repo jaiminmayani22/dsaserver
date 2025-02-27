@@ -886,7 +886,7 @@ const sendMarketingWhatsAppMessages = async (mobileNumbers, images, _id, caption
       } catch (error) {
         console.log(`Failed to send message to ${mobileNumber} : `, error);
       }
-    };
+    }
     if (_id) {
       try {
         await updateCampaignStatus(_id, "completed");
@@ -1157,27 +1157,27 @@ const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, 
 
     for (const mobileNumber of mobileNumbers) {
       try {
-        const user = await CLIENT_MODULE.find({ whatsapp_number: mobileNumber });
-        if (!user || user.length === 0) {
+        const user = await CLIENT_MODULE.findOne({ whatsapp_number: mobileNumber, isDeleted: false });
+        if (!user) {
           console.log(`User not found for mobile number: ${mobileNumber}`);
           continue;
         }
 
         const tempImagePath = await editUtilityImage({
-          username: user[0].name,
+          username: user.name, // No [0] needed
           number: mobileNumber,
-          company_name: user[0].company_name,
-          email: user[0].email,
-          instagramID: user[0].instagramID,
-          facebookID: user[0].facebookID,
-          profilePicUrl: user[0].profile_picture?.url,
-          logoImage: user[0].company_profile_picture?.url,
-          userWebsite: user[0].website,
+          company_name: user.company_name,
+          email: user.email,
+          instagramID: user.instagramID,
+          facebookID: user.facebookID,
+          profilePicUrl: user.profile_picture?.url,
+          logoImage: user.company_profile_picture?.url,
+          userWebsite: user.website,
           selectedRefTemplate: refTemplate,
           imagePath: images,
-          city: user[0].city,
-          district: user[0].district,
-          address: user[0].address,
+          city: user.city,
+          district: user.district,
+          address: user.address,
           _id: _id,
         });
 
@@ -1218,7 +1218,7 @@ const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, 
       } catch (error) {
         console.log(`Failed to process mobile number ${mobileNumber}:`, error);
       }
-    };
+    }
     if (_id) {
       try {
         await updateCampaignStatus(_id, "completed");
