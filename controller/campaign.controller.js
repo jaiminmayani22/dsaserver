@@ -703,25 +703,33 @@ const sendInstantMessage = async (req, res, cron) => {
     }
 
     try {
-      for (const client of clients) {
-        if (client.whatsapp_number) {
-          const latestLog = await MESSAGE_LOG.findOne({ mobileNumber: client.whatsapp_number, isDeleted: false }).sort({ updatedAt: -1 });
+      await Promise.all(
+        clients.map(async (client) => {
+          if (!client.whatsapp_number) return;
 
-          if (latestLog) {
-            const isStatusInvalid = !['read', 'sent', 'delivered'].includes(latestLog.status);
-            const isWithinLastHour =
-              latestLog.updatedAt instanceof Date &&
-              latestLog.updatedAt.getTime() > oneHourAgo &&
-              latestLog.updatedAt.getTime() <= Date.now();
+          try {
+            const latestLog = await MESSAGE_LOG.findOne({ mobileNumber: client.whatsapp_number, isDeleted: false })
+              .sort({ updatedAt: -1 });
 
-            if (isStatusInvalid && isWithinLastHour) {
-              freezedAudience.push(client._id);
-              continue;
+            if (latestLog) {
+              const isStatusInvalid = !['read', 'sent', 'delivered'].includes(latestLog.status);
+              const isWithinLastHour =
+                latestLog.updatedAt instanceof Date &&
+                latestLog.updatedAt.getTime() > oneHourAgo &&
+                latestLog.updatedAt.getTime() <= Date.now();
+
+              if (isStatusInvalid && isWithinLastHour) {
+                freezedAudience.push(client._id);
+                return;
+              }
             }
+
+            mobileNumbers.push(client.whatsapp_number);
+          } catch (error) {
+            console.error(`Error processing client ${client._id}:`, error.message);
           }
-          mobileNumbers.push(client.whatsapp_number);
-        }
-      }
+        })
+      );
     } catch (logError) {
       if (cron !== true && res) {
         return res.status(500).json({ message: "Error while processing message logs.", error: logError.message });
@@ -867,41 +875,6 @@ const stripHtmlTags = (htmlContent) => {
   return htmlContent.replace(/<\/?[^>]+(>|$)/g, "");
 };
 
-const sendMarketingWhatsAppMessages = async (mobileNumbers, images, _id, caption, messageType, documentType) => {
-  try {
-    for (const mobileNumber of mobileNumbers) {
-      try {
-        const messageData = prepareMessageData(mobileNumber, images, caption, documentType);
-        if (!messageData) {
-          console.error(`Failed to prepare payload for mobile number: ${mobileNumber}`);
-          continue;
-        }
-
-        const isSuccess = await whatsappAPISend(messageData, _id, messageType, caption);
-        if (isSuccess) {
-          console.log(`Message sent successfully to: ${mobileNumber}`);
-        } else {
-          console.error(`Failed to send message to: ${mobileNumber}`);
-        }
-      } catch (error) {
-        console.log(`Failed to send message to ${mobileNumber} : `, error);
-      }
-    }
-    if (_id) {
-      try {
-        await updateCampaignStatus(_id, "completed");
-      } catch (updateError) {
-        console.log(`Failed to update campaign status for campaign ${_id}:`, updateError);
-      }
-    } else {
-      console.log("Warning: Cannot update campaign status because _id is undefined.");
-    }
-    return true;
-  } catch (error) {
-    console.log(`Error in sending WhatsApp messages for campaign ${_id} : `, error);
-  }
-};
-
 const prepareMessageData = (mobileNumber, images, caption, documentType) => {
   const baseTemplate = {
     messaging_product: "whatsapp",
@@ -938,6 +911,31 @@ const prepareMessageData = (mobileNumber, images, caption, documentType) => {
     baseTemplate.template.name = CONSTANT.TEMPLATE_NAME.FOR_ONLY_TEXT;
   }
   return baseTemplate;
+};
+
+const sendMarketingWhatsAppMessages = async (mobileNumbers, images, _id, caption, messageType, documentType) => {
+  try {
+    await Promise.all(
+      mobileNumbers.map(async (mobileNumber) => {
+        const messageData = prepareMessageData(mobileNumber, images, caption, documentType);
+        if (messageData) {
+          await whatsappAPISend(messageData, _id, messageType, caption);
+        }
+      })
+    );
+    if (_id) {
+      try {
+        await updateCampaignStatus(_id, "completed");
+      } catch (updateError) {
+        console.log(`Failed to update campaign status for campaign ${_id}:`, updateError);
+      }
+    } else {
+      console.log("Warning: Cannot update campaign status because _id is undefined.");
+    }
+    return true;
+  } catch (error) {
+    console.log(`Error in sending WhatsApp messages for campaign ${_id} : `, error);
+  }
 };
 
 const sendTextWhatsAppMessages = async (mobileNumbers, _id, caption, messageType) => {
@@ -1155,70 +1153,53 @@ const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, 
       console.log("Template not found");
     }
 
-    for (const mobileNumber of mobileNumbers) {
-      try {
-        const user = await CLIENT_MODULE.findOne({ whatsapp_number: mobileNumber, isDeleted: false });
-        if (!user) {
-          console.log(`User not found for mobile number: ${mobileNumber}`);
-          continue;
+    await Promise.all(
+      mobileNumbers.map(async (mobileNumber) => {
+        try {
+          const user = await CLIENT_MODULE.findOne({ whatsapp_number: mobileNumber, isDeleted: false });
+          if (!user) return;
+
+          const tempImagePath = await editUtilityImage({
+            username: user.name,
+            number: mobileNumber,
+            company_name: user.company_name,
+            email: user.email,
+            instagramID: user.instagramID,
+            facebookID: user.facebookID,
+            profilePicUrl: user.profile_picture?.url,
+            logoImage: user.company_profile_picture?.url,
+            userWebsite: user.website,
+            selectedRefTemplate: refTemplate,
+            imagePath: images,
+            city: user.city,
+            district: user.district,
+            address: user.address,
+            _id: _id,
+          });
+
+          const imageUrl = `${process.env.BACKEND_URL}${CONSTANT.UPLOAD_DOC_PATH.SCHEDULE_UTILITY_EDITED}/${path.basename(tempImagePath)}`;
+
+          const messageData = {
+            messaging_product: "whatsapp",
+            recepient_type: "individual",
+            to: mobileNumber,
+            type: "template",
+            template: {
+              name: CONSTANT.TEMPLATE_NAME.FOR_UTILITY,
+              language: { code: "en" },
+              components: [
+                { type: "header", parameters: [{ type: "image", image: { link: imageUrl } }] },
+                { type: "body", parameters: [{ type: "text", text: caption || "" }] },
+              ],
+            },
+          };
+
+          await whatsappAPISend(messageData, _id, messageType, caption);
+        } catch (error) {
+          console.error(`Error processing ${mobileNumber}:`, error.message);
         }
-
-        const tempImagePath = await editUtilityImage({
-          username: user.name, // No [0] needed
-          number: mobileNumber,
-          company_name: user.company_name,
-          email: user.email,
-          instagramID: user.instagramID,
-          facebookID: user.facebookID,
-          profilePicUrl: user.profile_picture?.url,
-          logoImage: user.company_profile_picture?.url,
-          userWebsite: user.website,
-          selectedRefTemplate: refTemplate,
-          imagePath: images,
-          city: user.city,
-          district: user.district,
-          address: user.address,
-          _id: _id,
-        });
-
-        const absoluteTempImagePath = path.resolve(tempImagePath);
-        const imageUrl =
-          `${process.env.BACKEND_URL}` +
-          CONSTANT.UPLOAD_DOC_PATH.SCHEDULE_UTILITY_EDITED +
-          "/" +
-          `${path.basename(absoluteTempImagePath)}`;
-
-        const messageData = {
-          messaging_product: "whatsapp",
-          recepient_type: "individual",
-          to: `${mobileNumber}`,
-          type: "template",
-          template: {
-            name: CONSTANT.TEMPLATE_NAME.FOR_UTILITY,
-            language: { code: "en" },
-            components: [
-              {
-                type: "header",
-                parameters: [{ type: "image", image: { link: imageUrl } }],
-              },
-              {
-                type: "body",
-                parameters: [{ type: "text", text: caption || "" }],
-              },
-            ],
-          },
-        };
-
-        const isSuccess = await whatsappAPISend(messageData, _id, messageType, caption);
-        if (isSuccess) {
-          console.log(`Message sent successfully to: ${mobileNumber}`);
-        } else {
-          console.log(`Message failed to send to: ${mobileNumber}`);
-        }
-      } catch (error) {
-        console.log(`Failed to process mobile number ${mobileNumber}:`, error);
-      }
-    }
+      })
+    );
     if (_id) {
       try {
         await updateCampaignStatus(_id, "completed");
@@ -1244,7 +1225,7 @@ const whatsappAPISend = async (messageData, _id, messageType, caption) => {
     });
 
     if (existingLog) {
-      console.log(`Message already sent to ${messageData.to} for campaign ${_id}, skipping.`);
+      // console.log(`Message already sent to ${messageData.to} for campaign ${_id}, skipping.`);
       return false;
     }
 
@@ -1258,10 +1239,10 @@ const whatsappAPISend = async (messageData, _id, messageType, caption) => {
     });
 
     const data = await response.json();
-    if (!response.ok || (!Array.isArray(data.contacts) || !Array.isArray(data.messages) || !data.contacts.length || !data.messages.length)) {
-      console.error(
-        `WhatsApp API Error (Campaign ${_id}): ${data.message || 'Unknown error'}`
-      );
+    if (!response.ok || !data || !data.contacts || !data.messages || !data.contacts.length || !data.messages.length) {
+      // console.error(
+      //   `WhatsApp API Error (Campaign ${_id}): ${data.message || 'Unknown error'}`
+      // );
       try {
         await CAMPAIGN_MODULE.findByIdAndUpdate(
           _id,
@@ -1269,10 +1250,10 @@ const whatsappAPISend = async (messageData, _id, messageType, caption) => {
           { new: true }
         );
       } catch (error) {
-        console.error(
-          `Error updating unproceedNumbers for campaign ${_id}:`,
-          error.message
-        );
+        // console.error(
+        //   `Error updating unproceedNumbers for campaign ${_id}:`,
+        //   error.message
+        // );
       }
       return false;
     }
@@ -1310,15 +1291,15 @@ const whatsappAPISend = async (messageData, _id, messageType, caption) => {
         try {
           await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { $inc: { process: 1 } }, { new: true });
         } catch (error) {
-          console.error(`Error updating process count for campaign ${_id}:`, error.message);
+          // console.error(`Error updating process count for campaign ${_id}:`, error.message);
         }
       }
       return true;
     } catch (error) {
-      console.error(
-        `Error updating or creating message log for campaign ${_id}, number: ${logEntry.mobileNumber}`,
-        error.message
-      );
+      // console.error(
+      //   `Error updating or creating message log for campaign ${_id}, number: ${logEntry.mobileNumber}`,
+      //   error.message
+      // );
       return false;
     }
   } catch (error) {
