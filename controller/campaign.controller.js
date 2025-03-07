@@ -703,33 +703,33 @@ const sendInstantMessage = async (req, res, cron) => {
     }
 
     try {
-      await Promise.all(
-        clients.map(async (client) => {
-          if (!client.whatsapp_number) return;
+      for (const client of clients) {
+        if (!client.whatsapp_number) continue;
 
-          try {
-            const latestLog = await MESSAGE_LOG.findOne({ mobileNumber: client.whatsapp_number, isDeleted: false })
-              .sort({ updatedAt: -1 });
+        try {
+          const latestLog = await MESSAGE_LOG.findOne({
+            mobileNumber: client.whatsapp_number,
+            isDeleted: false
+          }).sort({ updatedAt: -1 });
 
-            if (latestLog) {
-              const isStatusInvalid = !['read', 'sent', 'delivered'].includes(latestLog.status);
-              const isWithinLastHour =
-                latestLog.updatedAt instanceof Date &&
-                latestLog.updatedAt.getTime() > oneHourAgo &&
-                latestLog.updatedAt.getTime() <= Date.now();
+          if (latestLog) {
+            const isStatusInvalid = !['read', 'sent', 'delivered'].includes(latestLog.status);
+            const isWithinLastHour =
+              latestLog.updatedAt instanceof Date &&
+              latestLog.updatedAt.getTime() > oneHourAgo &&
+              latestLog.updatedAt.getTime() <= Date.now();
 
-              if (isStatusInvalid && isWithinLastHour) {
-                freezedAudience.push(client._id);
-                return;
-              }
+            if (isStatusInvalid && isWithinLastHour) {
+              freezedAudience.push(client._id);
+              continue;
             }
-
-            mobileNumbers.push(client.whatsapp_number);
-          } catch (error) {
-            console.error(`Error processing client ${client._id}:`, error.message);
           }
-        })
-      );
+
+          mobileNumbers.push(client.whatsapp_number);
+        } catch (error) {
+          console.error(`Error processing client ${client._id}:`, error.message);
+        }
+      }
     } catch (logError) {
       if (cron !== true && res) {
         return res.status(500).json({ message: "Error while processing message logs.", error: logError.message });
@@ -915,19 +915,23 @@ const prepareMessageData = (mobileNumber, images, caption, documentType) => {
 
 const sendMarketingWhatsAppMessages = async (mobileNumbers, images, _id, caption, messageType, documentType) => {
   try {
-    await Promise.all(
-      mobileNumbers.map(async (mobileNumber) => {
-        const messageData = prepareMessageData(mobileNumber, images, caption, documentType);
-        if (messageData) {
-          await whatsappAPISend(messageData, _id, messageType, caption);
+    for (const mobileNumber of mobileNumbers) {
+      const messageData = prepareMessageData(mobileNumber, images, caption, documentType);
+
+      if (messageData) {
+        const send = await whatsappAPISend(messageData, _id, messageType, caption);
+        if (!send) {
+          // console.warn("Message sent but not confirmed for campaign:", _id);
+          continue;
         }
-      })
-    );
+        continue;
+      }
+    }
     if (_id) {
       try {
         await updateCampaignStatus(_id, "completed");
-      } catch (updateError) {
-        console.log(`Failed to update campaign status for campaign ${_id}:`, updateError);
+      } catch (error) {
+        console.log(`Failed to update campaign status for campaign ${_id}:`, error);
       }
     } else {
       console.log("Warning: Cannot update campaign status because _id is undefined.");
@@ -972,8 +976,8 @@ const sendTextWhatsAppMessages = async (mobileNumbers, _id, caption, messageType
     if (_id) {
       try {
         await updateCampaignStatus(_id, "completed");
-      } catch (updateError) {
-        console.log(`Failed to update campaign status for campaign ${_id}:`, updateError);
+      } catch (error) {
+        console.log(`Failed to update campaign status for campaign ${_id}:`, error);
       }
     } else {
       console.log("Warning: Cannot update campaign status because _id is undefined.");
@@ -1153,58 +1157,57 @@ const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, 
       console.log("Template not found");
     }
 
-    await Promise.all(
-      mobileNumbers.map(async (mobileNumber) => {
-        try {
-          const user = await CLIENT_MODULE.findOne({ whatsapp_number: mobileNumber, isDeleted: false });
-          if (!user) return;
+    for (const mobileNumber of mobileNumbers) {
+      try {
+        const user = await CLIENT_MODULE.findOne({ whatsapp_number: mobileNumber, isDeleted: false });
+        if (!user) continue;
 
-          const tempImagePath = await editUtilityImage({
-            username: user.name,
-            number: mobileNumber,
-            company_name: user.company_name,
-            email: user.email,
-            instagramID: user.instagramID,
-            facebookID: user.facebookID,
-            profilePicUrl: user.profile_picture?.url,
-            logoImage: user.company_profile_picture?.url,
-            userWebsite: user.website,
-            selectedRefTemplate: refTemplate,
-            imagePath: images,
-            city: user.city,
-            district: user.district,
-            address: user.address,
-            _id: _id,
-          });
+        const tempImagePath = await editUtilityImage({
+          username: user.name,
+          number: mobileNumber,
+          company_name: user.company_name,
+          email: user.email,
+          instagramID: user.instagramID,
+          facebookID: user.facebookID,
+          profilePicUrl: user.profile_picture?.url,
+          logoImage: user.company_profile_picture?.url,
+          userWebsite: user.website,
+          selectedRefTemplate: refTemplate,
+          imagePath: images,
+          city: user.city,
+          district: user.district,
+          address: user.address,
+          _id: _id,
+        });
 
-          const imageUrl = `${process.env.BACKEND_URL}${CONSTANT.UPLOAD_DOC_PATH.SCHEDULE_UTILITY_EDITED}/${path.basename(tempImagePath)}`;
+        const imageUrl = `${process.env.BACKEND_URL}${CONSTANT.UPLOAD_DOC_PATH.SCHEDULE_UTILITY_EDITED}/${path.basename(tempImagePath)}`;
 
-          const messageData = {
-            messaging_product: "whatsapp",
-            recepient_type: "individual",
-            to: mobileNumber,
-            type: "template",
-            template: {
-              name: CONSTANT.TEMPLATE_NAME.FOR_UTILITY,
-              language: { code: "en" },
-              components: [
-                { type: "header", parameters: [{ type: "image", image: { link: imageUrl } }] },
-                { type: "body", parameters: [{ type: "text", text: caption || "" }] },
-              ],
-            },
-          };
+        const messageData = {
+          messaging_product: "whatsapp",
+          recepient_type: "individual",
+          to: mobileNumber,
+          type: "template",
+          template: {
+            name: CONSTANT.TEMPLATE_NAME.FOR_UTILITY,
+            language: { code: "en" },
+            components: [
+              { type: "header", parameters: [{ type: "image", image: { link: imageUrl } }] },
+              { type: "body", parameters: [{ type: "text", text: caption || "" }] },
+            ],
+          },
+        };
 
-          await whatsappAPISend(messageData, _id, messageType, caption);
-        } catch (error) {
-          console.error(`Error processing ${mobileNumber}:`, error.message);
-        }
-      })
-    );
+        await whatsappAPISend(messageData, _id, messageType, caption);
+        continue;
+      } catch (error) {
+        console.error(`Error processing ${mobileNumber}:`, error.message);
+      }
+    }
     if (_id) {
       try {
         await updateCampaignStatus(_id, "completed");
-      } catch (updateError) {
-        console.log(`Failed to update campaign status for campaign ${_id}:`, updateError);
+      } catch (error) {
+        console.log(`Failed to update campaign status for campaign ${_id}:`, error);
       }
     } else {
       console.log("Warning: Cannot update campaign status because _id is undefined.");
@@ -1239,7 +1242,7 @@ const whatsappAPISend = async (messageData, _id, messageType, caption) => {
     });
 
     const data = await response.json();
-    if (!response.ok || !data || !data.contacts || !data.messages || !data.contacts.length || !data.messages.length) {
+    if (!response.ok || !data?.messages?.length) {
       // console.error(
       //   `WhatsApp API Error (Campaign ${_id}): ${data.message || 'Unknown error'}`
       // );

@@ -420,7 +420,7 @@ module.exports = Object.freeze({
   //   FOR_DOCUMENT: "schedule_msg_wt_doc",
   //   FOR_ONLY_TEXT: "wt_only_text"
   // }
- 
+
   //DSA TEMPLATES
   TEMPLATE_NAME: {
     FOR_UTILITY: "schedule_msg_wt_image_utility",
