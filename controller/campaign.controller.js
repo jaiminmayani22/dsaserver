@@ -1062,8 +1062,8 @@ const editUtilityImage = async ({
 
         for (const key of sortedKeys) {
           const value = replacements[key];
-          const regex = new RegExp(key, 'i');
-          updatedContent = updatedContent.replace(regex, value) || updatedContent;
+          const regex = new RegExp(`\\b${key}\\b`, 'gi'); 
+          updatedContent = updatedContent.replace(regex, value);          
         }
 
         if (/logo/i.test(content)) {
