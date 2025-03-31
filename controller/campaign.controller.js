@@ -1046,8 +1046,8 @@ const editUtilityImage = async ({
         let updatedContent = content;
 
         const replacements = {
-          company_name: company_name || '',
           name: username || '',
+          company_name: company_name || '',
           number: number || '',
           instagramId: instagramID || '',
           facebookId: facebookID || '',
@@ -1062,8 +1062,7 @@ const editUtilityImage = async ({
 
         for (const key of sortedKeys) {
           const value = replacements[key];
-          const regex = new RegExp(`(?<!\\{)${key}(?!\\})`, 'gi'); 
-          updatedContent = updatedContent.replace(regex, value);          
+          updatedContent = updatedContent.split(key).join(value);       
         }
 
         if (/logo/i.test(content)) {
