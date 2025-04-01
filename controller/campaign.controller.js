@@ -884,15 +884,7 @@ const prepareMessageData = (mobileNumber, images, caption, documentType) => {
     template: {
       language: { code: "en" },
       components: [
-        {
-          type: "body", parameters: [{
-            type: "text",
-            text: {
-              preview_url: true,
-              body: caption
-            }
-          }]
-        },
+        { type: "body", parameters: [{ type: "text", text: caption || "Hello" }] },
       ],
     },
   };
@@ -965,12 +957,7 @@ const sendTextWhatsAppMessages = async (mobileNumbers, _id, caption, messageType
             components: [
               {
                 type: "body",
-                parameters: [{
-                  type: "text", text: {
-                    preview_url: true,
-                    body: caption
-                  }
-                }],
+                parameters: [{ type: "text", text: caption || "Hello" }],
               },
             ],
           },
@@ -1075,7 +1062,7 @@ const editUtilityImage = async ({
 
         for (const key of sortedKeys) {
           const value = replacements[key];
-          updatedContent = updatedContent.split(key).join(value);
+          updatedContent = updatedContent.split(key).join(value);       
         }
 
         if (/logo/i.test(content)) {
@@ -1204,14 +1191,7 @@ const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, 
             language: { code: "en" },
             components: [
               { type: "header", parameters: [{ type: "image", image: { link: imageUrl } }] },
-              {
-                type: "body", parameters: [{
-                  type: "text", text: {
-                    preview_url: true,
-                    body: caption
-                  }
-                }]
-              },
+              { type: "body", parameters: [{ type: "text", text: caption || "" }] },
             ],
           },
         };
