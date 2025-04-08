@@ -996,6 +996,7 @@ const editUtilityImage = async ({
   instagramID,
   facebookID,
   logoImage,
+  profilePicUrl,
   userWebsite,
   selectedRefTemplate,
   imagePath,
@@ -1106,6 +1107,49 @@ const editUtilityImage = async ({
           }
 
           updatedContent = updatedContent.replace(/logo/i, '');
+        }
+      
+        if (/profile/i.test(content)) {
+          if (profilePicUrl) {
+            try {
+              const imageResponse = await fetch(profilePicUrl);
+              if (imageResponse.ok) {
+                const logoBuffer = await imageResponse.buffer();
+                const logoImageLoaded = await loadImage(logoBuffer);
+
+                if (logoImageLoaded) {
+                  const originalWidth = logoImageLoaded.width;
+                  const originalHeight = logoImageLoaded.height;
+                  let logoWidth, logoHeight;
+
+                  if (originalWidth > originalHeight) {
+                    logoWidth = parseFloat(size);
+                    logoHeight = (originalHeight / originalWidth) * logoWidth;
+                  } else {
+                    logoHeight = parseFloat(size);
+                    logoWidth = (originalWidth / originalHeight) * logoHeight;
+                  }
+
+                  // if (logoHeight !== 140) {
+                  //   logoHeight = 160;
+                  //   logoWidth = (originalWidth / originalHeight) * logoHeight;
+                  // }
+                  const drawX = calculatedx - logoWidth / 2;
+                  const drawY = calculatedy - logoHeight / 2;
+
+                  ctx.drawImage(logoImageLoaded, drawX, drawY, logoWidth, logoHeight);
+
+                  updatedContent = updatedContent.replace(/profile/i, '');
+                }
+              } else {
+                console.error('Failed to fetch logo image:', imageResponse.statusText);
+              }
+            } catch (error) {
+              console.error('Error loading logo image:', error);
+            }
+          }
+
+          updatedContent = updatedContent.replace(/profile/i, '');
         }
 
         ctx.font = `${fontWeight} ${fontStyle} ${parseFloat(size)}px ${fontFamily}`;
