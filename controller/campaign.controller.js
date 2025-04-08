@@ -673,6 +673,16 @@ const sendInstantMessage = async (req, res, cron) => {
         return;
       }
     }
+    try {
+      await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { status: "processing" }, { new: true });
+    } catch (statusUpdateError) {
+      if (cron !== true && res) {
+        return res.status(500).json({ message: "Failed to update campaign status.", error: statusUpdateError.message });
+      } else {
+        console.error("Failed to update campaign status:", statusUpdateError);
+        return;
+      }
+    }
 
     let mobileNumbers = [];
     let freezedAudience = [];
@@ -751,16 +761,6 @@ const sendInstantMessage = async (req, res, cron) => {
     }
 
     const imageUrl = document?.url || null;
-    try {
-      await CAMPAIGN_MODULE.findByIdAndUpdate(_id, { status: "processing" }, { new: true });
-    } catch (statusUpdateError) {
-      if (cron !== true && res) {
-        return res.status(500).json({ message: "Failed to update campaign status.", error: statusUpdateError.message });
-      } else {
-        console.error("Failed to update campaign status:", statusUpdateError);
-        return;
-      }
-    }
     mobileNumbers = [...new Set(mobileNumbers)];
 
     if (messageType === 'marketing' && imageUrl) {
@@ -1062,7 +1062,7 @@ const editUtilityImage = async ({
 
         for (const key of sortedKeys) {
           const value = replacements[key];
-          updatedContent = updatedContent.split(key).join(value);       
+          updatedContent = updatedContent.split(key).join(value);
         }
 
         if (/logo/i.test(content)) {
