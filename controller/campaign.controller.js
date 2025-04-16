@@ -916,15 +916,12 @@ const prepareMessageData = (mobileNumber, images, caption, documentType) => {
 const sendMarketingWhatsAppMessages = async (mobileNumbers, images, _id, caption, messageType, documentType) => {
   try {
     for (const mobileNumber of mobileNumbers) {
-      const messageData = prepareMessageData(mobileNumber, images, caption, documentType);
-
-      if (messageData) {
-        const send = await whatsappAPISend(messageData, _id, messageType, caption);
-        if (!send) {
-          // console.warn("Message sent but not confirmed for campaign:", _id);
-          continue;
-        }
+      try {
+        const messageData = prepareMessageData(mobileNumber, images, caption, documentType);
+        await whatsappAPISend(messageData, _id, messageType, caption);
         continue;
+      } catch (error) {
+        console.error(`Error processing ${mobileNumber}:`, error.message);
       }
     }
     if (_id) {
@@ -938,7 +935,7 @@ const sendMarketingWhatsAppMessages = async (mobileNumbers, images, _id, caption
     }
     return true;
   } catch (error) {
-    console.log(`Error in sending WhatsApp messages for campaign ${_id} : `, error);
+    console.log(`Failed to send WhatsApp messages for campaign ${_id}:`, error);
   }
 };
 
@@ -963,16 +960,12 @@ const sendTextWhatsAppMessages = async (mobileNumbers, _id, caption, messageType
           },
         };
 
-        const isSuccess = await whatsappAPISend(messageData, _id, messageType, caption);
-        if (isSuccess) {
-          console.log(`Message sent successfully to: ${mobileNumber}`);
-        } else {
-          console.log(`Message failed to send to: ${mobileNumber}`);
-        }
+        await whatsappAPISend(messageData, _id, messageType, caption);
+        continue;
       } catch (error) {
-        console.log(`Failed to send message to ${mobileNumber}:`, error);
+        console.error(`Error processing ${mobileNumber}:`, error.message);
       }
-    };
+    }
     if (_id) {
       try {
         await updateCampaignStatus(_id, "completed");
@@ -984,7 +977,7 @@ const sendTextWhatsAppMessages = async (mobileNumbers, _id, caption, messageType
     }
     return true;
   } catch (error) {
-    console.log(`Error in sending WhatsApp messages for campaign ${_id}:`, error);
+    console.log(`Failed to send WhatsApp messages for campaign ${_id}:`, error);
   }
 };
 
@@ -1108,7 +1101,7 @@ const editUtilityImage = async ({
 
           updatedContent = updatedContent.replace(/logo/i, '');
         }
-      
+
         if (/profile/i.test(content)) {
           if (profilePicUrl) {
             try {
