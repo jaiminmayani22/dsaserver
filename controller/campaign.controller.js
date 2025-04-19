@@ -913,16 +913,20 @@ const prepareMessageData = (mobileNumber, images, caption, documentType) => {
   return baseTemplate;
 };
 
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 const sendMarketingWhatsAppMessages = async (mobileNumbers, images, _id, caption, messageType, documentType) => {
   try {
     for (const mobileNumber of mobileNumbers) {
       try {
         const messageData = prepareMessageData(mobileNumber, images, caption, documentType);
         await whatsappAPISend(messageData, _id, messageType, caption);
-        continue;
       } catch (error) {
         console.error(`Error processing ${mobileNumber}:`, error.message);
       }
+      await delay(2000);
     }
     if (_id) {
       try {
@@ -961,10 +965,10 @@ const sendTextWhatsAppMessages = async (mobileNumbers, _id, caption, messageType
         };
 
         await whatsappAPISend(messageData, _id, messageType, caption);
-        continue;
       } catch (error) {
         console.error(`Error processing ${mobileNumber}:`, error.message);
       }
+      await delay(2000);
     }
     if (_id) {
       try {
@@ -1234,10 +1238,10 @@ const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, 
         };
 
         await whatsappAPISend(messageData, _id, messageType, caption);
-        continue;
       } catch (error) {
         console.error(`Error processing ${mobileNumber}:`, error.message);
       }
+      await delay(2000);
     }
     if (_id) {
       try {
