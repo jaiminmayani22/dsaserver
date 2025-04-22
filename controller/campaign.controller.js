@@ -884,7 +884,7 @@ const prepareMessageData = (mobileNumber, images, caption, documentType) => {
     template: {
       language: { code: "en" },
       components: [
-        { type: "body", parameters: [{ type: "text", text: caption || "Hello" }] },
+        { type: "body", parameters: [{ type: "text", text: caption.replace(/\r/g, '').replace(/\n/g, ' ') || "Hello" }] },
       ],
     },
   };
@@ -958,7 +958,7 @@ const sendTextWhatsAppMessages = async (mobileNumbers, _id, caption, messageType
             components: [
               {
                 type: "body",
-                parameters: [{ type: "text", text: caption || "Hello" }],
+                parameters: [{ type: "text", text: caption.replace(/\r/g, '').replace(/\n/g, ' ') || "Hello" }],
               },
             ],
           },
@@ -1232,7 +1232,7 @@ const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, 
             language: { code: "en" },
             components: [
               { type: "header", parameters: [{ type: "image", image: { link: imageUrl } }] },
-              { type: "body", parameters: [{ type: "text", text: caption || "" }] },
+              { type: "body", parameters: [{ type: "text", text: caption.replace(/\r/g, '').replace(/\n/g, ' ') || "" }] },
             ],
           },
         };
@@ -1307,7 +1307,7 @@ const whatsappAPISend = async (messageData, _id, messageType, caption) => {
       waMessageId: data.messages?.[0]?.id,
       status: data.messages?.[0]?.message_status,
       msgType: messageType,
-      messageTitle: caption,
+      messageTitle: caption.replace(/\r/g, '').replace(/\n/g, ' ') || "Hello",
     };
 
     try {
