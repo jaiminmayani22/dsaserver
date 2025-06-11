@@ -47,19 +47,19 @@ exports.createCampaignMarketing = async (req, res, folder) => {
           });
         }
         let data = {
-          name: obj.name,
-          type: obj.type,
-          audience: obj.audience,
-          messageType: obj.messageType,
-          documentType: obj.documentType,
-          caption: obj.caption,
+          name: obj?.name,
+          type: obj?.type,
+          audience: obj?.audience,
+          messageType: obj?.messageType,
+          documentType: obj?.documentType,
+          caption: obj?.caption,
           button: obj?.button,
-          added: obj.addedBy,
-          document: obj.document,
+          added: obj?.addedBy,
+          document: obj?.document,
         };
 
         if (data.type === 'schedule') {
-          data.schedule = obj.schedule;
+          data.schedule = obj?.schedule;
         }
 
         let count;
@@ -80,13 +80,13 @@ exports.createCampaignMarketing = async (req, res, folder) => {
             const groupClients = await CLIENT_MODULE.find({ groupId: groupRegex, isDeleted: false }, { _id: 1 });
             count = groupClients.length;
             clientIds = groupClients.map(client => client._id);
-            data.groups = obj.groups;
+            data.groups = obj?.groups;
             break;
 
           case "favoriteContacts":
             const favoriteClients = await CLIENT_MODULE.find({ isFavorite: 'yes', isDeleted: false }, { _id: 1 });
-            count = favoriteClients.length;
-            clientIds = favoriteClients.map(client => client._id);
+            count = favoriteClients?.length;
+            clientIds = favoriteClients?.map(client => client._id);
             break;
 
           case "quickAudience":
@@ -107,17 +107,44 @@ exports.createCampaignMarketing = async (req, res, folder) => {
             clientIds = contacts.map(client => client._id);
             break;
 
+          case "sheetsAudience":
+            const sheetIdMatch = obj?.sheetUrl?.match(/\/spreadsheets\/d\/e\/([a-zA-Z0-9-_]+)/);
+            if (!sheetIdMatch) {
+              return res.status(400).send({ message: "Invalid Google Sheet URL" });
+            }
+
+            const sheetId = sheetIdMatch[1];
+            const response = await fetch(`https://docs.google.com/spreadsheets/d/e/${sheetId}/pub?output=csv`);
+            const csvText = await response.text();
+            const lines = csvText.trim().split('\n');
+
+            const headers = lines[0].split(',').map(h => h.trim());
+            const rows = lines.slice(1);
+
+            const contactsArray = rows.map(line => {
+              const values = line.split(',').map(val => val.trim());
+              const obj = {};
+              headers.forEach((key, i) => {
+                obj[key] = values[i] || '';
+              });
+              return obj;
+            });
+
+            count = contactsArray.length;
+            data.sheetContacts = contactsArray; // ✅ save full contacts in campaign
+            break;
+
           default:
             break;
         }
 
         data.countAudience = count;
-        data.audienceIds = clientIds;
+        data.audienceIds = clientIds ?? [];
 
         CAMPAIGN_MODULE.create({ ...data })
           .then(async (response) => {
-            if (commonService.isValidObjId(response._id)) {
-              if (obj.send === "yes") {
+            if (commonService.isValidObjId(response?._id)) {
+              if (obj?.send === "yes") {
                 try {
                   await sendInstantMessage({ body: response }, res);
                 } catch (error) {
@@ -244,12 +271,39 @@ exports.createCampaignUtility = async (req, res, folder) => {
             clientIds = contacts.map(client => client._id);
             break;
 
+          case "sheetsAudience":
+            const sheetIdMatch = obj?.sheetUrl?.match(/\/spreadsheets\/d\/e\/([a-zA-Z0-9-_]+)/);
+            if (!sheetIdMatch) {
+              return res.status(400).send({ message: "Invalid Google Sheet URL" });
+            }
+
+            const sheetId = sheetIdMatch[1];
+            const response = await fetch(`https://docs.google.com/spreadsheets/d/e/${sheetId}/pub?output=csv`);
+            const csvText = await response.text();
+            const lines = csvText.trim().split('\n');
+
+            const headers = lines[0].split(',').map(h => h.trim());
+            const rows = lines.slice(1);
+
+            const contactsArray = rows.map(line => {
+              const values = line.split(',').map(val => val.trim());
+              const obj = {};
+              headers.forEach((key, i) => {
+                obj[key] = values[i] || '';
+              });
+              return obj;
+            });
+
+            count = contactsArray.length;
+            data.sheetContacts = contactsArray; // ✅ save full contacts in campaign
+            break;
+
           default:
             break;
         }
 
         data.countAudience = count;
-        data.audienceIds = clientIds;
+        data.audienceIds = clientIds ?? [];
 
         CAMPAIGN_MODULE.create({ ...data })
           .then(async (response) => {
@@ -358,6 +412,7 @@ exports.createRetargetCampaign = async (req, res) => {
         groups: obj.groups,
         audienceIds: ids,
         countAudience: ids.length,
+        sheetContacts: obj?.sheetContacts
       };
       if (data.type === 'schedule') {
         data.schedule = obj.schedule;
@@ -661,10 +716,16 @@ exports.getMessageLog = async (req, res) => {
   }
 };
 
+const normalizeMobileNumber = (number) => {
+  if (!number) return null;
+  const cleanNumber = number.replace(/[^\d]/g, ''); // Remove non-numeric
+  return cleanNumber.startsWith('91') ? `+${cleanNumber}` : `+91${cleanNumber}`;
+};
+
 // FUNCTIONS FOR WHATSAPP MESSAGE
 const sendInstantMessage = async (req, res, cron) => {
   try {
-    const { _id, caption, messageType, document, audienceIds, documentType, freezedAudienceIds, freezedSend, selectedRefTemplate } = req.body;
+    const { _id, caption, messageType, document, audienceIds, documentType, freezedAudienceIds, freezedSend, selectedRefTemplate, sheetContacts, audience } = req.body;
     if (!_id || !messageType) {
       if (cron !== true && res) {
         return res.status(400).json({ message: "Campaign ID and message type are required." });
@@ -684,16 +745,17 @@ const sendInstantMessage = async (req, res, cron) => {
       }
     }
 
-    let mobileNumbers = [];
-    let freezedAudience = [];
-    const oneHourAgo = Date.now() - 3600000;
     let clients;
 
     try {
-      clients = await CLIENT_MODULE.find({
-        _id: { $in: freezedSend === 'yes' ? freezedAudienceIds : audienceIds },
-        isDeleted: false,
-      });
+      if (sheetContacts.length !== 0 && audience === 'sheetsAudience') {
+        clients = sheetContacts || [];
+      } else {
+        clients = await CLIENT_MODULE.find({
+          _id: { $in: freezedSend === 'yes' ? freezedAudienceIds : audienceIds },
+          isDeleted: false,
+        });
+      }
 
       if (!clients.length) {
         if (cron !== true && res) {
@@ -712,13 +774,18 @@ const sendInstantMessage = async (req, res, cron) => {
       }
     }
 
+    let mobileNumbers = [];
+    let freezedAudience = [];
+    const oneHourAgo = Date.now() - 3600000;
+
     try {
       for (const client of clients) {
         if (!client.whatsapp_number) continue;
+        const normalizedNumber = normalizeMobileNumber(client.whatsapp_number);
 
         try {
           const latestLog = await MESSAGE_LOG.findOne({
-            mobileNumber: client.whatsapp_number,
+            mobileNumber: normalizedNumber,
             isDeleted: false
           }).sort({ updatedAt: -1 });
 
@@ -730,12 +797,12 @@ const sendInstantMessage = async (req, res, cron) => {
               latestLog.updatedAt.getTime() <= Date.now();
 
             if (isStatusInvalid && isWithinLastHour) {
-              freezedAudience.push(client._id);
+              if (client._id) freezedAudience.push(client._id);
               continue;
             }
           }
 
-          mobileNumbers.push(client.whatsapp_number);
+          mobileNumbers.push(normalizedNumber);
         } catch (error) {
           console.error(`Error processing client ${client._id}:`, error.message);
         }
@@ -790,7 +857,16 @@ const sendInstantMessage = async (req, res, cron) => {
 
     if (messageType === 'utility' && imageUrl) {
       try {
-        const sendSuccess = await sendUtilityWhatsAppMessages(mobileNumbers, imageUrl, _id, caption, selectedRefTemplate, messageType);
+        const sendSuccess = await sendUtilityWhatsAppMessages(
+          mobileNumbers,
+          imageUrl,
+          _id,
+          caption,
+          selectedRefTemplate,
+          messageType,
+          audience,
+          sheetContacts
+        );
         if (sendSuccess) {
           if (cron !== true && res) {
             return res.status(200).json({ message: `${CONSTANT.COLLECTION.CAMPAIGN} ${CONSTANT.MESSAGE.CREATE_SENT_SUCCESSFULLY}` });
@@ -1190,34 +1266,76 @@ const editUtilityImage = async ({
   }
 };
 
-const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, selectedRefTemplate, messageType) => {
+const sendUtilityWhatsAppMessages = async (
+  mobileNumbers,
+  images,
+  _id,
+  caption,
+  selectedRefTemplate,
+  messageType,
+  audience,
+  sheetContacts
+) => {
   try {
     const refTemplate = await REF_TEMPLATE_MODULE.findById(selectedRefTemplate);
     if (!refTemplate) {
       console.log("Template not found");
+      return;
     }
 
-    for (const mobileNumber of mobileNumbers) {
+    const recipients =
+      audience === "sheetsAudience"
+        ? sheetContacts
+        : mobileNumbers;
+
+    for (const contact of recipients) {
       try {
-        const user = await CLIENT_MODULE.findOne({ whatsapp_number: mobileNumber, isDeleted: false });
-        if (!user) continue;
+        let userData;
+
+        if (audience === "sheetsAudience") {
+          userData = {
+            username: contact.name || '',
+            number: contact.whatsapp_number || '',
+            company_name: contact.company_name || '',
+            email: contact.email || '',
+            instagramID: contact.instagramID || '',
+            facebookID: contact.facebookID || '',
+            profilePicUrl: contact.profile_picture || '',
+            logoImage: contact.company_profile_picture || '',
+            userWebsite: contact.website || '',
+            city: contact.city || '',
+            district: contact.district || '',
+            address: contact.address || '',
+          };
+        } else {
+          const user = await CLIENT_MODULE.findOne({
+            whatsapp_number: contact,
+            isDeleted: false,
+          });
+
+          if (!user) continue;
+
+          userData = {
+            username: user.name || '',
+            number: contact,
+            company_name: user.company_name || '',
+            email: user.email || '',
+            instagramID: user.instagramID || '',
+            facebookID: user.facebookID || '',
+            profilePicUrl: user.profile_picture?.url || '',
+            logoImage: user.company_profile_picture?.url || '',
+            userWebsite: user.website || '',
+            city: user.city || '',
+            district: user.district || '',
+            address: user.address || '',
+          };
+        }
 
         const tempImagePath = await editUtilityImage({
-          username: user.name,
-          number: mobileNumber,
-          company_name: user.company_name,
-          email: user.email,
-          instagramID: user.instagramID,
-          facebookID: user.facebookID,
-          profilePicUrl: user.profile_picture?.url,
-          logoImage: user.company_profile_picture?.url,
-          userWebsite: user.website,
+          ...userData,
           selectedRefTemplate: refTemplate,
           imagePath: images,
-          city: user.city,
-          district: user.district,
-          address: user.address,
-          _id: _id,
+          _id,
         });
 
         const imageUrl = `${process.env.BACKEND_URL}${CONSTANT.UPLOAD_DOC_PATH.SCHEDULE_UTILITY_EDITED}/${path.basename(tempImagePath)}`;
@@ -1225,24 +1343,42 @@ const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, 
         const messageData = {
           messaging_product: "whatsapp",
           recepient_type: "individual",
-          to: mobileNumber,
+          to: userData.number,
           type: "template",
           template: {
             name: CONSTANT.TEMPLATE_NAME.FOR_UTILITY,
             language: { code: "en" },
             components: [
-              { type: "header", parameters: [{ type: "image", image: { link: imageUrl } }] },
-              { type: "body", parameters: [{ type: "text", text: caption.replace(/\r/g, '').replace(/\n/g, ' ') || "" }] },
+              {
+                type: "header",
+                parameters: [
+                  {
+                    type: "image",
+                    image: { link: imageUrl },
+                  },
+                ],
+              },
+              {
+                type: "body",
+                parameters: [
+                  {
+                    type: "text",
+                    text: caption?.replace(/\r/g, '').replace(/\n/g, ' ') || '',
+                  },
+                ],
+              },
             ],
           },
         };
 
         await whatsappAPISend(messageData, _id, messageType, caption);
       } catch (error) {
-        console.error(`Error processing ${mobileNumber}:`, error.message);
+        console.error(`Error processing ${audience === "sheetsAudience" ? contact.whatsapp_number : contact}:`, error.message);
       }
+
       await delay(2000);
     }
+
     if (_id) {
       try {
         await updateCampaignStatus(_id, "completed");
@@ -1252,6 +1388,7 @@ const sendUtilityWhatsAppMessages = async (mobileNumbers, images, _id, caption, 
     } else {
       console.log("Warning: Cannot update campaign status because _id is undefined.");
     }
+
     return true;
   } catch (error) {
     console.log(`Failed to send WhatsApp messages for campaign ${_id}:`, error);
@@ -1415,6 +1552,13 @@ exports.getMessagesForCampaign = async (req, res) => {
     //   },
     // ]);
 
+    const campaign = await CAMPAIGN_MODULE.findById(campaignId).lean();
+    if (!campaign) {
+      return res.status(404).json({
+        message: "Campaign not found",
+      });
+    }
+
     const logs = await MESSAGE_LOG.find({ camId: campaignId, isDeleted: false })
       .sort({ updatedAt: -1 })
       .lean();
@@ -1430,13 +1574,27 @@ exports.getMessagesForCampaign = async (req, res) => {
       }
     });
 
-    const mobileNumbers = uniqueLogs.map((log) => log.mobileNumber);
+    let clientLookup = new Map();
 
-    const clients = await CLIENT_MODULE.find({ isDeleted: false, whatsapp_number: { $in: mobileNumbers } })
-      .select("whatsapp_number name")
-      .lean();
+    if (campaign.audience === "sheetsAudience") {
+      // Use sheetContacts instead of DB lookup
+      for (const contact of campaign.sheetContacts || []) {
+        if (contact.whatsapp_number) {
+          clientLookup.set(contact.whatsapp_number, contact.name || null);
+        }
+      }
+    } else {
+      // Lookup from client collection
+      const mobileNumbers = uniqueLogs.map((log) => log.mobileNumber);
+      const clients = await CLIENT_MODULE.find({
+        isDeleted: false,
+        whatsapp_number: { $in: mobileNumbers },
+      })
+        .select("whatsapp_number name")
+        .lean();
 
-    const clientLookup = new Map(clients.map(client => [client.whatsapp_number, client.name]));
+      clientLookup = new Map(clients.map((client) => [client.whatsapp_number, client.name]));
+    }
 
     const finalLogs = uniqueLogs.map(log => ({
       ...log,
